@@ -108,11 +108,19 @@
 
   /* ---------- tablero ---------- */
   .tablerowrap{position:relative;}
+  /* Capa de barcos: va por encima de la grilla para que la silueta se lea
+     entera. Las celdas que tienen que ganarle (mira, ultimo disparo) suben
+     con z-index propio, por eso .tablero no crea contexto de apilado. */
+  .buques{position:absolute; inset:0; z-index:2; pointer-events:none;}
+  .buque{position:absolute;}
+  .buque svg{width:100%; height:100%; display:block;}
+  .buque.fantasma{opacity:.55;}
+  .minibuque{display:block; flex:none;}
   .tablero{
-    display:grid; grid-template-columns:15px repeat(10,1fr); grid-template-rows:15px repeat(10,1fr);
+    display:grid; grid-template-columns:15px repeat(var(--n,10),1fr); grid-template-rows:15px repeat(var(--n,10),1fr);
     gap:2px; width:100%; aspect-ratio:1/1; touch-action:manipulation;
   }
-  .tablero.chico{gap:1.5px; grid-template-columns:11px repeat(10,1fr); grid-template-rows:11px repeat(10,1fr);}
+  .tablero.chico{gap:1.5px; grid-template-columns:11px repeat(var(--n,10),1fr); grid-template-rows:11px repeat(var(--n,10),1fr);}
   .rot{font-family:var(--mono); font-size:9px; color:var(--faint); display:grid; place-items:center; line-height:1;}
   .tablero.chico .rot{font-size:7px;}
   .celda{
@@ -122,7 +130,8 @@
     font-size:13px; line-height:1;
   }
   .tablero.chico .celda{border-radius:2px; font-size:8px;}
-  .celda.barco{background:linear-gradient(155deg,var(--casco),#93A5B1); box-shadow:inset 0 0 0 1px var(--casco-borde);}
+  /* Debajo de un barco el agua va mas oscura: le da sombra a la silueta. */
+  .celda.barco{background:linear-gradient(155deg,#123A53,#0A2438); box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);}
   .celda.agua::after{
     content:""; width:26%; height:26%; border-radius:50%;
     background:rgba(255,255,255,.40); box-shadow:0 0 0 2px rgba(255,255,255,.12);
@@ -131,8 +140,8 @@
   .celda.tocado::after{content:"\2715"; color:#fff; font-weight:700; font-size:.9em;}
   .celda.hundido{background:linear-gradient(155deg,#8C2E1C,#5A1B10); box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);}
   .celda.hundido::after{content:"\2715"; color:rgba(255,255,255,.5); font-weight:700; font-size:.9em;}
-  .celda.ultimo{outline:2px solid var(--sand); outline-offset:-1px; z-index:1;}
-  .celda.mira{outline:2px solid var(--sand); outline-offset:-1px; z-index:1; background:linear-gradient(155deg,#245C7E,#173D57);}
+  .celda.ultimo{outline:2px solid var(--sand); outline-offset:-1px; z-index:3;}
+  .celda.mira{outline:2px solid var(--sand); outline-offset:-1px; z-index:3; background:linear-gradient(155deg,#245C7E,#173D57);}
   .celda.mira::before{
     content:""; position:absolute; inset:24%; border:2px solid var(--sand); border-radius:50%;
     animation:pulso 1.1s ease-in-out infinite;
@@ -162,9 +171,11 @@
 
   .flotitas{display:flex; gap:5px; flex-wrap:wrap; margin:8px 0 0;}
   .flotita{
+    display:flex; align-items:center; gap:5px;
     font-size:11px; font-family:var(--mono);
-    padding:3px 7px; border-radius:20px; background:var(--sunk); color:var(--soft);
+    padding:3px 8px 3px 6px; border-radius:20px; background:var(--sunk); color:var(--soft);
   }
+  .flotita.muerto .minibuque{opacity:.6;}
   .flotita.muerto{background:var(--fuego-dim); color:var(--fuego); text-decoration:line-through;}
 
   .propio{margin-top:14px; display:flex; gap:12px; align-items:flex-start;}
@@ -200,12 +211,9 @@
   .barcofila.sel{border-color:var(--sand); background:var(--sand-dim);}
   .barcofila.listo{opacity:.55;}
   .barcofila .nom{flex:1; font-weight:500; font-size:14px; min-width:0;}
-  .barcofila .casillas{display:flex; gap:2px; flex:none;}
-  .barcofila .casillas i{
-    width:12px; height:12px; border-radius:2px; display:block;
-    background:linear-gradient(155deg,var(--casco),#93A5B1); box-shadow:inset 0 0 0 1px var(--casco-borde);
-  }
-  .barcofila.listo .casillas i{background:var(--sunk); box-shadow:inset 0 0 0 1px var(--line);}
+  .barcofila .casillas{display:flex; align-items:center; gap:6px; flex:none;}
+  .barcofila .casillas .largo{font-family:var(--mono); font-size:11px; color:var(--faint);}
+  .barcofila.listo .minibuque{opacity:.45;}
   .barcofila .marca{color:var(--ok); font-size:14px; font-weight:700; flex:none; width:14px; text-align:center;}
 
   .ayuda{
@@ -424,15 +432,15 @@
 
 <script>
 "use strict";
-const VERSION = "v1.0.0";
+const VERSION = "v1.1.0";
 
 /* ==================================================================
    Modelo
    ================================================================== */
 
-const N = 10;                       // lado del tablero
+const N = 11;                       // lado del tablero
 const TOT = N * N;
-const LETRAS = "ABCDEFGHIJ";
+const LETRAS = "ABCDEFGHIJK";
 
 const FLOTA = [
   { id:"portaaviones", nombre:"Portaaviones", largo:5 },
@@ -440,8 +448,9 @@ const FLOTA = [
   { id:"crucero",      nombre:"Crucero",      largo:3 },
   { id:"submarino",    nombre:"Submarino",    largo:3 },
   { id:"destructor",   nombre:"Destructor",   largo:2 },
+  { id:"lancha",       nombre:"Lancha",       largo:1 },
 ];
-const CASCO_TOTAL = FLOTA.reduce((a,b) => a + b.largo, 0);   // 17
+const CASCO_TOTAL = FLOTA.reduce((a,b) => a + b.largo, 0);   // 18
 
 // disparos[i]: 0 sin tocar · 1 agua · 2 impacto
 const SIN = 0, AGUA = 1, IMPACTO = 2;
@@ -504,6 +513,40 @@ function quitarBarco(t, id){
   t.barcos.splice(n, 1);
   t.ocupa.fill(-1);
   t.barcos.forEach((b, k) => b.celdas.forEach(cel => { t.ocupa[cel] = k; }));
+}
+
+/**
+ * Gira un barco ya desplegado sin sacarlo del mar.
+ * Pivota sobre la proa; si asi se sale del tablero o pisa a otro, lo desliza
+ * hacia atras hasta encontrarle lugar. Si no entra de ninguna forma lo deja
+ * exactamente como estaba. Devuelve "ok" | "nocabe" | "unico" | "no".
+ */
+function rotarBarco(t, id, permiteContacto){
+  const n = t.barcos.findIndex(x => x.def.id === id);
+  if (n === -1) return "no";
+  const b = t.barcos[n];
+  if (b.def.largo === 1) return "unico";        // la lancha da igual como se mire
+
+  // Se saca del mapa de ocupacion para que no choque contra si mismo.
+  for (const cel of b.celdas) t.ocupa[cel] = -1;
+
+  const horiz = !b.horiz;
+  const [f, c] = rc(Math.min(...b.celdas));
+  let elegidas = null;
+  for (let k = 0; k < b.def.largo; k++){
+    if (horiz ? (c - k < 0) : (f - k < 0)) break;
+    const celdas = tramo(horiz ? idx(f, c - k) : idx(f - k, c), b.def.largo, horiz);
+    if (celdas && cabe(t, celdas, permiteContacto)){ elegidas = celdas; break; }
+  }
+
+  if (!elegidas){
+    for (const cel of b.celdas) t.ocupa[cel] = n;
+    return "nocabe";
+  }
+  b.celdas = elegidas;
+  b.horiz = horiz;
+  for (const cel of elegidas) t.ocupa[cel] = n;
+  return "ok";
 }
 
 /** Despliegue automático. Reintenta desde cero si se traba. */
@@ -607,10 +650,14 @@ function iaNormal(t){
     const pool = enLinea.length ? enLinea : sueltos;
     if (pool.length) return pool[Math.floor(Math.random() * pool.length)];
   }
-  // Paridad: ningún barco mide menos de 2, así que medio tablero alcanza.
+  // Damero: un barco de largo L no puede esconderse de una red de paso L, asi
+  // que alcanza con barrer una fraccion del tablero. Ojo que la lancha mide 1:
+  // mientras siga viva no hay red que valga y hay que mirar todo.
   const l = libres(t);
-  const pares = l.filter(i => { const [f, c] = rc(i); return (f + c) % 2 === 0; });
-  const pool = pares.length ? pares : l;
+  const vivos = barcosVivos(t);
+  const paso = vivos.length ? Math.min(...vivos) : 1;
+  const red = paso > 1 ? l.filter(i => { const [f, c] = rc(i); return (f + c) % paso === 0; }) : l;
+  const pool = red.length ? red : l;
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -644,13 +691,17 @@ function iaDificil(t){
     }
   }
 
-  let mejor = -1, max = -1;
+  // Cuando queda viva la lancha el mapa se aplana y todas las casillas empatan.
+  // Ahi hay que desempatar al azar: si no, la maquina barre siempre en el mismo
+  // orden y el rival le aprende el recorrido de memoria.
+  let max = -1, empate = [];
   for (let i = 0; i < TOT; i++){
     if (t.disparos[i] !== SIN) continue;
-    if (puntaje[i] > max){ max = puntaje[i]; mejor = i; }
+    if (puntaje[i] > max){ max = puntaje[i]; empate = [i]; }
+    else if (puntaje[i] === max) empate.push(i);
   }
-  // Si el mapa quedó plano (no debería), cae en la heurística simple.
-  return max > 0 ? mejor : iaNormal(t);
+  if (max <= 0) return iaNormal(t);
+  return empate[Math.floor(Math.random() * empate.length)];
 }
 
 function iaElegir(t, dificultad){
@@ -769,12 +820,157 @@ function cargarPartida(){
    Utilidades de UI
    ================================================================== */
 
+/* ==================================================================
+   Dibujo de los barcos
+
+   La silueta se dibuja siempre acostada, en una caja de 100 de alto por 100
+   por casillero de largo, con la proa a la derecha. Los barcos verticales se
+   resuelven girando el grupo entero y dando vuelta el viewBox, asi el arte se
+   escribe una sola vez. El dibujo va en una capa aparte por encima de la
+   grilla: de ese modo el barco se ve entero y continuo, sin el escalonado que
+   queda cuando se pinta casillero por casillero.
+   ================================================================== */
+
+const PAL      = { casco:"#B9C6CF", alto:"#DCE4E9", bajo:"#8A9AA6", detalle:"#57697A" };
+const PAL_HUND = { casco:"#6F5A53", alto:"#8B7269", bajo:"#54443F", detalle:"#3B2E29" };
+/* Las siluetas de las listas no van sobre el mar sino sobre una tarjeta, que
+   en tema claro es casi blanca: con la paleta del tablero no se veian. Estos
+   tonos medios se leen igual sobre blanco y sobre la tarjeta oscura. */
+const PAL_MINI      = { casco:"#7E909D", alto:"#A6B3BD", bajo:"#5F7180", detalle:"#41525F" };
+const PAL_MINI_HUND = { casco:"#9C6B58", alto:"#B5836E", bajo:"#7A5142", detalle:"#573528" };
+
+function cascoBase(L, P, y0 = 38, y1 = 84){
+  const m = (y0 + y1) / 2;
+  return `<path d="M10,${y0} L${L-36},${y0} L${L-5},${m} L${L-36},${y1} L10,${y1} Z"
+      fill="${P.casco}" stroke="${P.casco}" stroke-width="9" stroke-linejoin="round"/>
+    <path d="M16,${y0+5} L${L-44},${y0+5}" stroke="${P.alto}" stroke-width="5" stroke-linecap="round" opacity=".7"/>
+    <path d="M16,${y1-5} L${L-44},${y1-5}" stroke="${P.bajo}" stroke-width="7" stroke-linecap="round" opacity=".65"/>`;
+}
+const torreta = (x, P, y=40) =>
+  `<circle cx="${x}" cy="${y}" r="15" fill="${P.bajo}"/>
+   <rect x="${x}" y="${y-5}" width="34" height="10" rx="4" fill="${P.detalle}"/>`;
+const puente = (x, w, P, y=12, h=28) =>
+  `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="5" fill="${P.bajo}"/>
+   <path d="M${x+6},${y+9} H${x+w-6}" stroke="${P.alto}" stroke-width="4" opacity=".45" stroke-linecap="round"/>`;
+const chimenea = (x, P, w=22, y=14, h=26) =>
+  `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${P.detalle}"/>`;
+const mastil = (x, P, desde=12) =>
+  `<path d="M${x},${desde} V2" stroke="${P.detalle}" stroke-width="5" stroke-linecap="round"/>`;
+
+/** Cada casillero acertado deja un boquete sobre el propio dibujo. */
+function quemadura(k){
+  const cx = k * 100 + 50, cy = 61;
+  return `<circle cx="${cx}" cy="${cy}" r="25" fill="#180C08" opacity=".85"/>
+    <circle cx="${cx}" cy="${cy}" r="25" fill="none" stroke="#E4674C" stroke-width="6"/>
+    <path d="M${cx-10},${cy-10} L${cx+10},${cy+10} M${cx+10},${cy-10} L${cx-10},${cy+10}"
+      stroke="#F2A996" stroke-width="7" stroke-linecap="round"/>`;
+}
+
+/** El arte de un barco, acostado y con la proa a la derecha, sin el <svg>. */
+function arteBuque(def, P){
+  const L = def.largo * 100;
+  switch (def.id){
+    case "portaaviones":
+      // cubierta corrida de punta a punta, con la isla sobre estribor
+      return cascoBase(L, P, 48, 86) +
+        `<path d="M5,26 L${L-20},26 L${L-3},40 L${L-20},54 L5,54 Z" fill="${P.alto}"/>
+         <path d="M5,54 H${L-20}" stroke="${P.bajo}" stroke-width="4" opacity=".5"/>
+         <path d="M40,40 H${L-108}" stroke="${P.detalle}" stroke-width="5" stroke-dasharray="26 22" opacity=".85"/>
+         <rect x="${L-150}" y="4" width="48" height="24" rx="4" fill="${P.detalle}"/>` +
+        mastil(L - 136, P, 4);
+    case "acorazado":
+      return cascoBase(L, P) +
+        torreta(70, P) + torreta(140, P) +
+        puente(196, 54, P) + mastil(223, P) + chimenea(262, P, 26) +
+        torreta(320, P);
+    case "crucero":
+      return cascoBase(L, P) +
+        torreta(56, P) +
+        puente(126, 46, P, 14, 26) + mastil(149, P, 14) + chimenea(186, P, 22, 16, 24) +
+        torreta(228, P);
+    case "submarino":
+      // casco de cigarro, vela al medio y periscopio
+      return `<path d="M12,62 Q12,42 48,42 H${L-50} Q${L-10},42 ${L-4},62 Q${L-10},84 ${L-50},84 H48 Q12,84 12,62 Z"
+                fill="${P.casco}"/>
+              <path d="M36,54 H${L-64}" stroke="${P.alto}" stroke-width="6" opacity=".45" stroke-linecap="round"/>
+              <rect x="116" y="16" width="62" height="30" rx="8" fill="${P.bajo}"/>` +
+        mastil(147, P, 16);
+    case "destructor":
+      return cascoBase(L, P, 42, 84) +
+        torreta(46, P, 44) +
+        puente(94, 38, P, 16, 26) + mastil(113, P, 16) + chimenea(142, P, 20, 18, 24);
+    default:  // lancha
+      return `<path d="M14,44 L60,44 L94,63 L60,82 L14,82 Z"
+                fill="${P.casco}" stroke="${P.casco}" stroke-width="8" stroke-linejoin="round"/>
+              <rect x="26" y="20" width="34" height="26" rx="5" fill="${P.bajo}"/>
+              <path d="M32,30 H54" stroke="${P.alto}" stroke-width="4" opacity=".45" stroke-linecap="round"/>` +
+        mastil(43, P, 20);
+  }
+}
+
+/** El <svg> completo de un barco puesto en el tablero, ya girado si va vertical. */
+function dibujoBuque(b){
+  const L = b.def.largo * 100;
+  const arte = arteBuque(b.def, b.hundido ? PAL_HUND : PAL) +
+    (b.golpes || []).map((g, k) => g ? quemadura(k) : "").join("");
+  const vertical = !b.horiz && b.def.largo > 1;
+  const caja = vertical ? `0 0 100 ${L}` : `0 0 ${L} 100`;
+  const contenido = vertical ? `<g transform="translate(100,0) rotate(90)">${arte}</g>` : arte;
+  return `<svg viewBox="${caja}" preserveAspectRatio="none">${contenido}</svg>`;
+}
+
+/** Silueta chiquita para las listas (dique seco, ayuda, flota enemiga). */
+function miniBuque(def, alto = 15, hundido = false){
+  const L = def.largo * 100;
+  return `<svg class="minibuque" viewBox="0 0 ${L} 100" width="${Math.round(alto * def.largo)}" height="${alto}"
+    preserveAspectRatio="xMidYMid meet" aria-hidden="true">${arteBuque(def, hundido ? PAL_MINI_HUND : PAL_MINI)}</svg>`;
+}
+
+/**
+ * Repinta la capa de barcos de un tablero.
+ * Las posiciones salen de medir las celdas reales, no de recalcular la grilla:
+ * asi funciona igual con cualquier tamaño de tablero y con el tablero chico.
+ */
+function capaBuques(el){
+  const wrap = el.parentElement;
+  let capa = wrap.querySelector(".buques");
+  if (!capa){ capa = document.createElement("div"); capa.className = "buques"; wrap.appendChild(capa); }
+  const lista = el._buques;
+  if (!lista || !lista.length || !el._celdas){ capa.textContent = ""; return; }
+
+  const base = wrap.getBoundingClientRect();
+  if (base.width < 20){ capa.textContent = ""; return; }   // todavía sin layout
+
+  let html = "";
+  for (const b of lista){
+    const orden = [...b.celdas].sort((a, z) => a - z);
+    const r0 = el._celdas[orden[0]].getBoundingClientRect();
+    const r1 = el._celdas[orden[orden.length - 1]].getBoundingClientRect();
+    const estilo = `left:${r0.left - base.left}px;top:${r0.top - base.top}px;` +
+                   `width:${r1.right - r0.left}px;height:${r1.bottom - r0.top}px`;
+    html += `<div class="buque${b.fantasma ? " fantasma" : ""}" style="${estilo}">${dibujoBuque(b)}</div>`;
+  }
+  capa.innerHTML = html;
+}
+
+/* Los tableros se miden en pixeles, así que hay que rehacerlos cuando cambian
+   de tamaño (rotar el teléfono, abrir el teclado) o cuando recién se muestran. */
+const observador = new ResizeObserver(entradas => {
+  for (const e of entradas) capaBuques(e.target);
+});
+function relotarTodo(){
+  requestAnimationFrame(() => {
+    document.querySelectorAll(".pantalla.activa .tablero").forEach(capaBuques);
+  });
+}
+
 const $  = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 
 function mostrar(id){
   $$(".pantalla").forEach(p => p.classList.toggle("activa", p.id === id));
   window.scrollTo(0, 0);
+  relotarTodo();       // recién ahora los tableros tienen tamaño para medir
 }
 
 /** Construye la grilla con rótulos una sola vez; después sólo se pintan clases. */
@@ -801,7 +997,10 @@ function armarTablero(el){
     }
   }
   el.appendChild(frag);
+  el.style.setProperty("--n", N);
   el._celdas = Array.from(el.querySelectorAll(".celda"));
+  el._buques = [];
+  observador.observe(el);
 }
 
 /**
@@ -810,7 +1009,7 @@ function armarTablero(el){
  */
 function pintar(el, t, verBarcos, opciones = {}){
   if (!el._celdas) armarTablero(el);
-  const { mira = null, ultimo = null } = opciones;
+  const { mira = null, ultimo = null, fantasma = null } = opciones;
   for (let i = 0; i < TOT; i++){
     const cel = el._celdas[i];
     const d = t.disparos[i];
@@ -823,6 +1022,18 @@ function pintar(el, t, verBarcos, opciones = {}){
     if (i === ultimo) cls += " ultimo";
     if (cel.className !== cls) cel.className = cls;
   }
+
+  // Se dibujan los propios, y del rival sólo los que ya se hundieron.
+  const enPantalla = t.barcos.filter(b => verBarcos || b.hundido).map(b => {
+    const orden = [...b.celdas].sort((a, z) => a - z);
+    return {
+      def: b.def, celdas: orden, horiz: b.horiz, hundido: b.hundido,
+      golpes: orden.map(cel => t.disparos[cel] === IMPACTO),
+    };
+  });
+  if (fantasma) enPantalla.push(fantasma);
+  el._buques = enPantalla;
+  capaBuques(el);
 }
 
 function chipsFlota(el, t){
@@ -830,7 +1041,7 @@ function chipsFlota(el, t){
   for (const b of t.barcos){
     const s = document.createElement("span");
     s.className = "flotita" + (b.hundido ? " muerto" : "");
-    s.textContent = b.def.nombre + " " + b.def.largo;
+    s.innerHTML = miniBuque(b.def, 11, b.hundido) + "<span>" + b.def.nombre + "</span>";
     el.appendChild(s);
   }
 }
@@ -841,7 +1052,7 @@ const pct = (a, b) => b ? Math.round(a * 100 / b) + "%" : "0%";
    Colocación
    ================================================================== */
 
-const col = { tablero:null, seleccion:null, horiz:true, previa:[] };
+const col = { tablero:null, seleccion:null, horiz:true, previa:[], aviso:null };
 
 function abrirColocacion(jugador){
   G.colocando = jugador;
@@ -849,23 +1060,29 @@ function abrirColocacion(jugador){
   col.seleccion = FLOTA[0].id;
   col.horiz = true;
   col.previa = [];
+  col.aviso = null;
 
   $("#colTitulo").textContent = G.modo === "dos" ? G.nombres[jugador] : "Desplegá tu flota";
+  mostrar("pColocar");
   armarTablero($("#tabCol"));
   refrescarColocacion();
-  mostrar("pColocar");
 }
 
 function refrescarColocacion(){
   const t = col.tablero;
-  pintar($("#tabCol"), t, true);
+  const def = FLOTA.find(d => d.id === col.seleccion);
 
-  // previsualización del barco seleccionado
+  // Fantasma del barco seleccionado, con su silueta y todo.
+  let fantasma = null;
+  const previaValida = col.previa.length && def && cabe(t, col.previa, ajustes.contacto);
+  if (previaValida){
+    fantasma = { def, celdas: [...col.previa], horiz: col.horiz, hundido: false, golpes: [], fantasma: true };
+  }
+  pintar($("#tabCol"), t, true, { fantasma });
+
   if (col.previa.length){
-    const def = FLOTA.find(d => d.id === col.seleccion);
-    const ok = def && cabe(t, col.previa, ajustes.contacto);
     for (const i of col.previa){
-      $("#tabCol")._celdas[i].classList.add(ok ? "previa" : "previamal");
+      $("#tabCol")._celdas[i].classList.add(previaValida ? "previa" : "previamal");
     }
   }
 
@@ -883,7 +1100,7 @@ function refrescarColocacion(){
 
     const cas = document.createElement("span");
     cas.className = "casillas";
-    for (let k = 0; k < def.largo; k++) cas.appendChild(document.createElement("i"));
+    cas.innerHTML = '<span class="largo">' + def.largo + '</span>' + miniBuque(def, 14);
 
     const marca = document.createElement("span");
     marca.className = "marca";
@@ -897,16 +1114,35 @@ function refrescarColocacion(){
   $("#colListo").disabled = faltan > 0;
   $("#colListo").textContent = faltan > 0 ? "Faltan " + faltan : "Zarpar";
 
-  const sel = FLOTA.find(d => d.id === col.seleccion);
-  const yaEsta = sel && t.barcos.some(b => b.def.id === sel.id);
-  if (faltan === 0){
-    $("#colAyuda").innerHTML = "Flota completa. Tocá un barco de la lista para reubicarlo.";
+  const yaEsta = def && t.barcos.some(b => b.def.id === def.id);
+  if (col.aviso){
+    $("#colAyuda").innerHTML = col.aviso;
+    col.aviso = null;
+  } else if (yaEsta && def.largo === 1){
+    $("#colAyuda").innerHTML = "<b>" + def.nombre + "</b> mide un casillero: no hay nada que girar. " +
+      "Tocá el mar para moverla.";
   } else if (yaEsta){
-    $("#colAyuda").innerHTML = "<b>" + sel.nombre + "</b> ya está en el agua. Tocalo de nuevo para levantarlo.";
-  } else if (sel){
-    $("#colAyuda").innerHTML = "<b>" + sel.nombre + "</b> (" + sel.largo + ") · " +
+    $("#colAyuda").innerHTML = "<b>" + def.nombre + "</b> está en el agua. Tocalo otra vez para girarlo, " +
+      "o tocá el mar para moverlo.";
+  } else if (def){
+    $("#colAyuda").innerHTML = "<b>" + def.nombre + "</b> (" + def.largo + ") · " +
       (col.horiz ? "horizontal" : "vertical") + " · tocá el mar para ubicarlo.";
   }
+}
+
+/** Gira un barco ya desplegado y deja dicho en la ayuda qué pasó. */
+function girarDesplegado(id){
+  const r = rotarBarco(col.tablero, id, ajustes.contacto);
+  const def = FLOTA.find(d => d.id === id);
+  if (r === "nocabe"){
+    col.aviso = "<b>" + def.nombre + "</b> no tiene lugar para girar ahí. Movelo primero.";
+  } else if (r === "unico"){
+    col.aviso = "La <b>lancha</b> mide un casillero: girarla no cambia nada.";
+  }
+  col.seleccion = id;
+  col.previa = [];
+  refrescarColocacion();
+  return r;
 }
 
 function tocarCeldaColocacion(i){
@@ -1109,12 +1345,14 @@ function terminar(ganador){
 
   $("#finRotA").textContent = G.modo === "ia" ? "Tu flota" : G.nombres[0];
   $("#finRotB").textContent = G.modo === "ia" ? "Flota enemiga" : G.nombres[1];
+
+  // Primero mostrar y recién después pintar: los barcos se ubican midiendo las
+  // celdas, y una pantalla oculta mide cero.
+  mostrar("pFin");
   armarTablero($("#tabFinA"));
   armarTablero($("#tabFinB"));
   pintar($("#tabFinA"), G.tableros[0], true);
   pintar($("#tabFinB"), G.tableros[1], true);
-
-  mostrar("pFin");
   refrescarMenu();
 }
 
@@ -1249,20 +1487,21 @@ function hojaComoJuega(){
   abrirHoja(`
     <h2>Cómo se juega</h2>
     <p style="font-size:14px;line-height:1.55;color:var(--soft)">
-      Cada uno esconde cinco barcos en una grilla de 10×10. Por turnos se canta una casilla del
+      Cada uno esconde su flota en una grilla de ${N}×${N}. Por turnos se canta una casilla del
       mar del otro: o es <b style="color:var(--ink)">agua</b>, o es <b style="color:var(--ink)">tocado</b>.
       Cuando se acierta a todas las casillas de un barco, se hunde. Gana quien hunde primero la flota entera.
     </p>
     <h3>La flota</h3>
     <div class="dique" style="margin-top:0">
       ${FLOTA.map(d => `<div class="barcofila"><span class="nom">${d.nombre}</span>
-        <span class="casillas">${"<i></i>".repeat(d.largo)}</span>
-        <span class="marca" style="color:var(--soft);font-family:var(--mono);font-size:12px">${d.largo}</span></div>`).join("")}
+        <span class="casillas"><span class="largo">${d.largo}</span>${miniBuque(d, 15)}</span></div>`).join("")}
     </div>
     <h3>En el teléfono</h3>
     <p style="font-size:14px;line-height:1.55;color:var(--soft)">
-      Para <b style="color:var(--ink)">colocar</b>: elegí el barco en la lista, tocá <b style="color:var(--ink)">↻</b>
-      arriba para rotarlo y tocá el mar donde va la proa. «Al azar» te lo resuelve solo.<br><br>
+      Para <b style="color:var(--ink)">colocar</b>: elegí el barco en la lista y tocá el mar donde va la proa.
+      Una vez que está en el agua, <b style="color:var(--ink)">tocalo de nuevo para girarlo</b> entre horizontal y
+      vertical, ahí mismo donde está — también sirve el botón <b style="color:var(--ink)">↻</b> de arriba. Para
+      mudarlo, seleccionalo en la lista y tocá el mar en otro lado. «Al azar» te lo resuelve solo.<br><br>
       Para <b style="color:var(--ink)">disparar</b>: el primer toque apunta y el segundo confirma, así no se te
       escapa un tiro. Si te molesta, apagalo en Ajustes.
     </p>
@@ -1335,7 +1574,13 @@ $("#btnSeguir").addEventListener("click", () => {
 // --- colocación ---
 $("#tabCol").addEventListener("click", (e) => {
   const cel = e.target.closest(".celda");
-  if (cel) tocarCeldaColocacion(+cel.dataset.i);
+  if (!cel) return;
+  const i = +cel.dataset.i;
+  const n = col.tablero.ocupa[i];
+  // Tocar un barco que ya está en el agua lo gira sobre su lugar.
+  // Tocar mar abierto ubica (o muda) el que esté seleccionado.
+  if (n !== -1) girarDesplegado(col.tablero.barcos[n].def.id);
+  else tocarCeldaColocacion(i);
 });
 $("#tabCol").addEventListener("pointermove", (e) => {
   if (e.pointerType !== "mouse") return;      // en táctil no hay hover que valga
@@ -1356,14 +1601,25 @@ $("#dique").addEventListener("click", (e) => {
   if (!fila) return;
   const id = fila.dataset.id;
   const puesto = col.tablero.barcos.some(b => b.def.id === id);
-  // tocar un barco ya colocado lo levanta; tocar otro simplemente lo selecciona
-  if (puesto && col.seleccion === id) quitarBarco(col.tablero, id);
+  // Volver a tocar el que ya estaba seleccionado y desplegado lo gira.
+  if (puesto && col.seleccion === id){ girarDesplegado(id); return; }
   col.seleccion = id;
   col.previa = [];
   refrescarColocacion();
 });
 
 $("#colRotar").addEventListener("click", () => {
+  // Si el seleccionado ya está en el agua, se gira ahí mismo; si todavía no,
+  // se cambia la orientación con la que va a entrar.
+  const puesto = col.tablero.barcos.some(b => b.def.id === col.seleccion);
+  if (puesto){
+    const r = girarDesplegado(col.seleccion);
+    if (r === "ok"){
+      const b = col.tablero.barcos.find(x => x.def.id === col.seleccion);
+      col.horiz = b.horiz;
+    }
+    return;
+  }
   col.horiz = !col.horiz;
   if (col.previa.length){
     const def = FLOTA.find(d => d.id === col.seleccion);
