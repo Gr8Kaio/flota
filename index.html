@@ -439,7 +439,7 @@
 
 <script>
 "use strict";
-const VERSION = "v1.1.1";
+const VERSION = "v1.2.0";
 
 /* ==================================================================
    Modelo
@@ -846,72 +846,125 @@ const PAL_HUND = { casco:"#6F5A53", alto:"#8B7269", bajo:"#54443F", detalle:"#3B
 const PAL_MINI      = { casco:"#7E909D", alto:"#A6B3BD", bajo:"#5F7180", detalle:"#41525F" };
 const PAL_MINI_HUND = { casco:"#9C6B58", alto:"#B5836E", bajo:"#7A5142", detalle:"#573528" };
 
-function cascoBase(L, P, y0 = 38, y1 = 84){
-  const m = (y0 + y1) / 2;
-  return `<path d="M10,${y0} L${L-36},${y0} L${L-5},${m} L${L-36},${y1} L10,${y1} Z"
-      fill="${P.casco}" stroke="${P.casco}" stroke-width="9" stroke-linejoin="round"/>
-    <path d="M16,${y0+5} L${L-44},${y0+5}" stroke="${P.alto}" stroke-width="5" stroke-linecap="round" opacity=".7"/>
-    <path d="M16,${y1-5} L${L-44},${y1-5}" stroke="${P.bajo}" stroke-width="7" stroke-linecap="round" opacity=".65"/>`;
+/* Todo se dibuja en PLANTA (vista cenital), que es como se mira el tablero:
+   el mar se ve desde arriba, así que los barcos también. La caja es de 100 de
+   alto por 100 por casillero de largo, la quilla va sobre y=50 y la proa
+   apunta a la derecha. Los verticales salen girando el grupo entero. */
+
+/**
+ * Silueta del casco vista desde arriba: popa redondeada, costados paralelos
+ * y proa en punta. `semimanga` es la mitad del ancho y `afinado` cuánto mide
+ * la punta de proa; una lancha la tiene proporcionalmente mucho más larga que
+ * un acorazado, y con un solo valor para todos unos quedan dardos y otros
+ * ladrillos.
+ */
+function cascoPlanta(L, P, semimanga = 32, afinado = Math.min(0.28 * L, 90)){
+  const y0 = 50 - semimanga, y1 = 50 + semimanga;
+  const popa = 7, proa = L - 4;
+  const codaste = popa + Math.min(0.06 * L, 18);        // fin de la curva de popa
+  const amura = L - afinado;                            // donde empieza a afinar
+  const medio = (amura + proa) / 2;
+  return `<path d="M${popa},${50 - semimanga * 0.55}
+      Q${popa},${y0} ${codaste},${y0}
+      L${amura},${y0}
+      Q${medio},${y0 + semimanga * 0.16} ${proa},50
+      Q${medio},${y1 - semimanga * 0.16} ${amura},${y1}
+      L${codaste},${y1}
+      Q${popa},${y1} ${popa},${50 + semimanga * 0.55} Z"
+      fill="${P.casco}" stroke="${P.detalle}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M${codaste + 6},50 H${amura}" stroke="${P.alto}" stroke-width="3" opacity=".5" stroke-linecap="round"/>`;
 }
-const torreta = (x, P, y=40) =>
-  `<circle cx="${x}" cy="${y}" r="15" fill="${P.bajo}"/>
-   <rect x="${x}" y="${y-5}" width="34" height="10" rx="4" fill="${P.detalle}"/>`;
-const puente = (x, w, P, y=12, h=28) =>
-  `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="5" fill="${P.bajo}"/>
-   <path d="M${x+6},${y+9} H${x+w-6}" stroke="${P.alto}" stroke-width="4" opacity=".45" stroke-linecap="round"/>`;
-const chimenea = (x, P, w=22, y=14, h=26) =>
-  `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${P.detalle}"/>`;
-const mastil = (x, P, desde=12) =>
-  `<path d="M${x},${desde} V2" stroke="${P.detalle}" stroke-width="5" stroke-linecap="round"/>`;
+
+/** Torreta vista desde arriba: la base redonda y los cañones asomando. */
+function torreta(x, P, { canones = 2, hacia = 1, r = 17, tubo = 32 } = {}){
+  const filas = canones === 3 ? [-10, 0, 10] : [-7, 7];
+  const barras = filas.map(dy =>
+    `<rect x="${hacia > 0 ? x : x - tubo}" y="${50 + dy - 3}" width="${tubo}" height="6" rx="3" fill="${P.detalle}"/>`
+  ).join("");
+  return barras + `<circle cx="${x}" cy="50" r="${r}" fill="${P.bajo}" stroke="${P.detalle}" stroke-width="2"/>`;
+}
+
+/** Bloque de superestructura, centrado sobre la quilla. */
+const caseta = (x, w, P, semi = 15) =>
+  `<rect x="${x}" y="${50 - semi}" width="${w}" height="${semi * 2}" rx="5"
+     fill="${P.bajo}" stroke="${P.detalle}" stroke-width="2"/>`;
+
+/** Desde arriba una chimenea es una boca ovalada. */
+const chimenea = (x, P, r = 9) =>
+  `<ellipse cx="${x}" cy="50" rx="${r}" ry="${r * 1.2}" fill="${P.detalle}"/>
+   <ellipse cx="${x}" cy="50" rx="${r * 0.45}" ry="${r * 0.55}" fill="#1B242B" opacity=".55"/>`;
 
 /** Cada casillero acertado deja un boquete sobre el propio dibujo. */
 function quemadura(k){
-  const cx = k * 100 + 50, cy = 61;
+  const cx = k * 100 + 50, cy = 50;
   return `<circle cx="${cx}" cy="${cy}" r="25" fill="#180C08" opacity=".85"/>
     <circle cx="${cx}" cy="${cy}" r="25" fill="none" stroke="#E4674C" stroke-width="6"/>
     <path d="M${cx-10},${cy-10} L${cx+10},${cy+10} M${cx+10},${cy-10} L${cx-10},${cy+10}"
       stroke="#F2A996" stroke-width="7" stroke-linecap="round"/>`;
 }
 
-/** El arte de un barco, acostado y con la proa a la derecha, sin el <svg>. */
+/** El arte de un barco en planta, proa a la derecha, sin el envoltorio <svg>. */
 function arteBuque(def, P){
   const L = def.largo * 100;
   switch (def.id){
-    case "portaaviones":
-      // cubierta corrida de punta a punta, con la isla sobre estribor
-      return cascoBase(L, P, 48, 86) +
-        `<path d="M5,26 L${L-20},26 L${L-3},40 L${L-20},54 L5,54 Z" fill="${P.alto}"/>
-         <path d="M5,54 H${L-20}" stroke="${P.bajo}" stroke-width="4" opacity=".5"/>
-         <path d="M40,40 H${L-108}" stroke="${P.detalle}" stroke-width="5" stroke-dasharray="26 22" opacity=".85"/>
-         <rect x="${L-150}" y="4" width="48" height="24" rx="4" fill="${P.detalle}"/>` +
-        mastil(L - 136, P, 4);
+    case "portaaviones": {
+      // La cubierta de vuelo tapa el casco entero (vuela por sobre la borda),
+      // asi que es ella la que define la silueta. Las marcas de pista van en
+      // claro para que se lean sobre el gris de la cubierta.
+      const proa = L - 6;
+      return cascoPlanta(L, P, 30) +
+        `<path d="M10,14 H${L - 120} Q${proa - 30},14 ${proa},44 L${proa},56
+                  Q${proa - 30},86 ${L - 120},86 H10 Q4,86 4,78 V22 Q4,14 10,14 Z"
+           fill="${P.casco}" stroke="${P.detalle}" stroke-width="3" stroke-linejoin="round"/>
+         <path d="M44,60 L${L - 155},60" stroke="${P.alto}" stroke-width="5"
+           stroke-dasharray="26 20" opacity=".95" stroke-linecap="round"/>
+         <path d="M26,28 L${L - 140},46" stroke="${P.alto}" stroke-width="4"
+           stroke-dasharray="22 16" opacity=".7" stroke-linecap="round"/>
+         <rect x="12" y="19" width="32" height="20" rx="3" fill="${P.bajo}"
+           stroke="${P.detalle}" stroke-width="1.5"/>
+         <rect x="${L - 205}" y="63" width="32" height="20" rx="3" fill="${P.bajo}"
+           stroke="${P.detalle}" stroke-width="1.5"/>
+         <rect x="${L - 186}" y="64" width="54" height="27" rx="4"
+           fill="${P.detalle}" stroke="${P.detalle}" stroke-width="2"/>
+         <circle cx="${L - 146}" cy="77" r="5" fill="${P.alto}" opacity=".8"/>`;
+    }
     case "acorazado":
-      return cascoBase(L, P) +
-        torreta(70, P) + torreta(140, P) +
-        puente(196, 54, P) + mastil(223, P) + chimenea(262, P, 26) +
-        torreta(320, P);
+      // Dos torretas a proa en superposición, tres cañones cada una.
+      return cascoPlanta(L, P, 31) +
+        torreta(0.17 * L, P, { canones: 3, hacia: -1, r: 18, tubo: 34 }) +
+        caseta(0.30 * L, 0.17 * L, P, 16) +
+        chimenea(0.51 * L, P, 11) +
+        torreta(0.64 * L, P, { canones: 3, r: 16, tubo: 30 }) +
+        torreta(0.79 * L, P, { canones: 3, r: 18, tubo: 34 });
     case "crucero":
-      return cascoBase(L, P) +
-        torreta(56, P) +
-        puente(126, 46, P, 14, 26) + mastil(149, P, 14) + chimenea(186, P, 22, 16, 24) +
-        torreta(228, P);
-    case "submarino":
-      // casco de cigarro, vela al medio y periscopio
-      return `<path d="M12,62 Q12,42 48,42 H${L-50} Q${L-10},42 ${L-4},62 Q${L-10},84 ${L-50},84 H48 Q12,84 12,62 Z"
-                fill="${P.casco}"/>
-              <path d="M36,54 H${L-64}" stroke="${P.alto}" stroke-width="6" opacity=".45" stroke-linecap="round"/>
-              <rect x="116" y="16" width="62" height="30" rx="8" fill="${P.bajo}"/>` +
-        mastil(147, P, 16);
+      return cascoPlanta(L, P, 28) +
+        torreta(0.18 * L, P, { hacia: -1, r: 16, tubo: 28 }) +
+        caseta(0.34 * L, 0.19 * L, P, 15) +
+        chimenea(0.58 * L, P, 9) +
+        torreta(0.76 * L, P, { r: 16, tubo: 28 });
+    case "submarino": {
+      // Cigarro: popa y proa redondeadas, sin punta. Lo que lo distingue de un
+      // barco de superficie es justamente que no tiene proa afilada.
+      const proa = L - 6;
+      return `<path d="M20,50 Q20,28 48,28 H${L - 62} Q${proa - 10},28 ${proa},50
+                       Q${proa - 10},72 ${L - 62},72 H48 Q20,72 20,50 Z"
+                fill="${P.casco}" stroke="${P.detalle}" stroke-width="3"/>
+              <path d="M40,50 H${L - 50}" stroke="${P.alto}" stroke-width="3" opacity=".45" stroke-linecap="round"/>
+              <rect x="${0.40 * L}" y="34" width="${0.19 * L}" height="32" rx="8"
+                fill="${P.bajo}" stroke="${P.detalle}" stroke-width="2"/>`;
+    }
     case "destructor":
-      return cascoBase(L, P, 42, 84) +
-        torreta(46, P, 44) +
-        puente(94, 38, P, 16, 26) + mastil(113, P, 16) + chimenea(142, P, 20, 18, 24);
+      return cascoPlanta(L, P, 26) +
+        torreta(0.20 * L, P, { hacia: -1, r: 15, tubo: 26 }) +
+        caseta(0.38 * L, 0.20 * L, P, 14) +
+        chimenea(0.62 * L, P, 8) +
+        torreta(0.79 * L, P, { r: 15, tubo: 26 });
     default:  // lancha
-      return `<path d="M14,44 L60,44 L94,63 L60,82 L14,82 Z"
-                fill="${P.casco}" stroke="${P.casco}" stroke-width="8" stroke-linejoin="round"/>
-              <rect x="26" y="20" width="34" height="26" rx="5" fill="${P.bajo}"/>
-              <path d="M32,30 H54" stroke="${P.alto}" stroke-width="4" opacity=".45" stroke-linecap="round"/>` +
-        mastil(43, P, 20);
+      // Lancha rápida: casco angosto y proa larga, para que no parezca un cajón.
+      return cascoPlanta(L, P, 23, 44) +
+        caseta(28, 24, P, 12) +
+        `<path d="M14,40 H24 M14,60 H24" stroke="${P.detalle}" stroke-width="4"
+           opacity=".8" stroke-linecap="round"/>`;
   }
 }
 

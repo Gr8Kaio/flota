@@ -84,7 +84,11 @@ Todo con un dedo, sin arrastrar:
 - **Mover** — lo seleccionás en la lista y tocás el mar en otro lado.
 - **Al azar** — resuelve la flota entera.
 
-Los barcos se dibujan como siluetas continuas en una capa SVG por encima de la grilla, no casillero por casillero: por eso un portaaviones se ve como un portaaviones y no como cinco cuadrados. El arte se escribe una sola vez, siempre acostado y con la proa a la derecha; los verticales salen girando el grupo y dando vuelta el `viewBox`. Cada impacto abre un boquete sobre el propio dibujo, y los hundidos pasan a una paleta quemada.
+Los barcos se dibujan como siluetas continuas en una capa SVG por encima de la grilla, no casillero por casillero: por eso un portaaviones se ve como un portaaviones y no como cinco cuadrados.
+
+Van **en planta**, vistos desde arriba, que es como se mira el tablero: dibujarlos de perfil sobre un mar cenital es un choque de perspectiva. Cada uno se reconoce por su silueta: el portaaviones por la cubierta de vuelo corrida con la pista marcada y la isla a estribor, el acorazado por las tres torretas triples, el crucero y el destructor por su torreta a proa y otra a popa, el submarino por el casco de cigarro sin proa afilada, y la lancha por lo angosta y puntiaguda.
+
+El arte se escribe una sola vez, siempre acostado y con la proa a la derecha; los verticales salen girando el grupo y dando vuelta el `viewBox`. El casco sale de un helper al que se le pasan la semimanga y el largo de la punta de proa: con un solo valor para todos, unos quedan como dardos y otros como ladrillos. Cada impacto abre un boquete sobre el propio dibujo, y los hundidos pasan a una paleta quemada.
 
 ## Notas
 
