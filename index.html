@@ -121,6 +121,11 @@
   .buque{position:absolute;}
   .buque svg{width:100%; height:100%; display:block;}
   .buque.fantasma{opacity:.55;}
+  /* Mientras se arrastra, el fantasma es el barco: tiene que verse firme. */
+  .tablero.arrastrando ~ .buques .buque.fantasma{
+    opacity:.95; filter:drop-shadow(0 5px 7px rgba(0,0,0,.55));
+  }
+  .tablero.arrastrando{touch-action:none;}
   .minibuque{display:block; flex:none;}
   .tablero{
     display:grid; grid-template-columns:15px repeat(var(--n,10),1fr); grid-template-rows:15px repeat(var(--n,10),1fr);
@@ -134,6 +139,7 @@
     background:linear-gradient(155deg,var(--mar-1),var(--mar-2));
     box-shadow:inset 0 0 0 1px var(--mar-linea);
     font-size:13px; line-height:1;
+    -webkit-touch-callout:none;
   }
   .tablero.chico .celda{border-radius:2px; font-size:8px;}
   /* Debajo de un barco el agua va mas oscura: le da sombra a la silueta. */
@@ -439,7 +445,7 @@
 
 <script>
 "use strict";
-const VERSION = "v1.2.0";
+const VERSION = "v1.3.0";
 
 /* ==================================================================
    Modelo
@@ -843,6 +849,9 @@ const PAL_HUND = { casco:"#6F5A53", alto:"#8B7269", bajo:"#54443F", detalle:"#3B
 /* Las siluetas de las listas no van sobre el mar sino sobre una tarjeta, que
    en tema claro es casi blanca: con la paleta del tablero no se veian. Estos
    tonos medios se leen igual sobre blanco y sobre la tarjeta oscura. */
+/* Barco levantado sobre una posicion que no sirve: se tiñe entero, porque el
+   fantasma tapa las celdas rojas de abajo y el aviso se perdia. */
+const PAL_MALO      = { casco:"#C98879", alto:"#E3AC9D", bajo:"#A2604F", detalle:"#6E3A2C" };
 const PAL_MINI      = { casco:"#7E909D", alto:"#A6B3BD", bajo:"#5F7180", detalle:"#41525F" };
 const PAL_MINI_HUND = { casco:"#9C6B58", alto:"#B5836E", bajo:"#7A5142", detalle:"#573528" };
 
@@ -971,7 +980,7 @@ function arteBuque(def, P){
 /** El <svg> completo de un barco puesto en el tablero, ya girado si va vertical. */
 function dibujoBuque(b){
   const L = b.def.largo * 100;
-  const arte = arteBuque(b.def, b.hundido ? PAL_HUND : PAL) +
+  const arte = arteBuque(b.def, b.hundido ? PAL_HUND : (b.invalido ? PAL_MALO : PAL)) +
     (b.golpes || []).map((g, k) => g ? quemadura(k) : "").join("");
   const vertical = !b.horiz && b.def.largo > 1;
   const caja = vertical ? `0 0 100 ${L}` : `0 0 ${L} 100`;
@@ -1112,7 +1121,16 @@ const pct = (a, b) => b ? Math.round(a * 100 / b) + "%" : "0%";
    Colocación
    ================================================================== */
 
-const col = { tablero:null, seleccion:null, horiz:true, previa:[], aviso:null };
+const col = {
+  tablero:null, seleccion:null, horiz:true, previa:[], aviso:null,
+  pendiente:null,      // toque que todavía puede convertirse en arrastre
+  arrastre:null,       // barco levantado que sigue al dedo
+  reloj:null,          // temporizador del mantener apretado
+  ultimoOrigen:null,   // para no repintar en cada píxel
+  ignorarClick:false,  // el click que llega después de soltar no debe girar
+};
+const MS_ALZAR = 380;  // cuánto hay que sostener para levantar un barco
+const PIXELES_CANCELA = 10;
 
 function abrirColocacion(jugador){
   G.colocando = jugador;
@@ -1121,6 +1139,11 @@ function abrirColocacion(jugador){
   col.horiz = true;
   col.previa = [];
   col.aviso = null;
+  col.pendiente = null;
+  col.arrastre = null;
+  col.ultimoOrigen = null;
+  col.ignorarClick = false;
+  clearTimeout(col.reloj);
 
   $("#colTitulo").textContent = G.modo === "dos" ? G.nombres[jugador] : "Desplegá tu flota";
   mostrar("pColocar");
@@ -1132,11 +1155,14 @@ function refrescarColocacion(){
   const t = col.tablero;
   const def = FLOTA.find(d => d.id === col.seleccion);
 
-  // Fantasma del barco seleccionado, con su silueta y todo.
+  // Fantasma del barco seleccionado, con su silueta y todo. Se dibuja aunque
+  // la posición no sirva: las celdas en rojo ya avisan que ahí no entra, y
+  // mientras se arrastra hace falta ver el barco en todo momento.
   let fantasma = null;
   const previaValida = col.previa.length && def && cabe(t, col.previa, ajustes.contacto);
-  if (previaValida){
-    fantasma = { def, celdas: [...col.previa], horiz: col.horiz, hundido: false, golpes: [], fantasma: true };
+  if (col.previa.length && def){
+    fantasma = { def, celdas: [...col.previa], horiz: col.horiz, hundido: false, golpes: [],
+                 fantasma: true, invalido: !previaValida };
   }
   pintar($("#tabCol"), t, true, { fantasma });
 
@@ -1175,19 +1201,130 @@ function refrescarColocacion(){
   $("#colListo").textContent = faltan > 0 ? "Faltan " + faltan : "Zarpar";
 
   const yaEsta = def && t.barcos.some(b => b.def.id === def.id);
-  if (col.aviso){
+  if (col.arrastre){
+    // Durante el arrastre el barco esta fuera del tablero, asi que sin esta
+    // rama caeria en la de "todavia no esta puesto" y diria cualquier cosa.
+    $("#colAyuda").innerHTML = previaValida
+      ? "Soltá el <b>" + col.arrastre.def.nombre + "</b> acá."
+      : "Ahí no entra: está ocupado.";
+  } else if (col.aviso){
     $("#colAyuda").innerHTML = col.aviso;
     col.aviso = null;
   } else if (yaEsta && def.largo === 1){
     $("#colAyuda").innerHTML = "<b>" + def.nombre + "</b> mide un casillero: no hay nada que girar. " +
-      "Tocá el mar para moverla.";
+      "Mantenela apretada para arrastrarla.";
   } else if (yaEsta){
-    $("#colAyuda").innerHTML = "<b>" + def.nombre + "</b> está en el agua. Tocalo otra vez para girarlo, " +
-      "o tocá el mar para moverlo.";
+    $("#colAyuda").innerHTML = "<b>" + def.nombre + "</b> está en el agua. Tocalo para girarlo, " +
+      "o mantenelo apretado para arrastrarlo.";
   } else if (def){
     $("#colAyuda").innerHTML = "<b>" + def.nombre + "</b> (" + def.largo + ") · " +
       (col.horiz ? "horizontal" : "vertical") + " · tocá el mar para ubicarlo.";
   }
+}
+
+/* ------------------------------------------------------------------
+   Mantener apretado para mover un barco
+
+   Un toque corto sobre un barco lo gira; sostenerlo lo levanta y lo pega al
+   dedo. El arrastre va encajado a la grilla: el barco salta de casillero en
+   casillero en vez de flotar libre, que en un tablero se siente mejor y no
+   deja sueltas ambiguas. Se implementa levantando el barco del modelo y
+   reusando el fantasma de previsualización, así el estado no se duplica.
+   ------------------------------------------------------------------ */
+
+/** Qué casillero del tablero de colocación está bajo un punto de la pantalla. */
+function celdaBajoElDedo(x, y){
+  const el = document.elementFromPoint(x, y);
+  const cel = el && el.closest ? el.closest(".celda") : null;
+  if (!cel || !$("#tabCol").contains(cel)) return null;
+  return +cel.dataset.i;
+}
+
+function alzarBarco(){
+  const p = col.pendiente;
+  col.pendiente = null;
+  if (!p || !col.tablero) return;
+  const n = col.tablero.ocupa[p.celda];
+  if (n === -1) return;
+
+  const b = col.tablero.barcos[n];
+  const orden = [...b.celdas].sort((a, z) => a - z);
+  col.arrastre = {
+    def: b.def, horiz: b.horiz,
+    agarre: orden.indexOf(p.celda),   // por qué parte del barco lo agarró
+    previas: orden,                   // para devolverlo si la suelta no sirve
+  };
+  quitarBarco(col.tablero, b.def.id);
+
+  col.seleccion = b.def.id;
+  col.horiz = b.horiz;
+  col.previa = orden;
+  col.ultimoOrigen = orden[0];
+  col.aviso = "Arrastrá el <b>" + b.def.nombre + "</b> y soltalo donde quieras.";
+  try { $("#tabCol").setPointerCapture(p.puntero); } catch {}
+  $("#tabCol").classList.add("arrastrando");
+  refrescarColocacion();
+}
+
+/** Mueve el fantasma al casillero que corresponda, sin salirse del tablero. */
+function arrastrarBarco(x, y){
+  const a = col.arrastre;
+  const bajo = celdaBajoElDedo(x, y);
+  if (bajo === null) return;
+
+  const [f, c] = rc(bajo);
+  const tope = N - a.def.largo;
+  let origen;
+  if (a.horiz){
+    const cc = Math.max(0, Math.min(c - a.agarre, tope));
+    origen = idx(f, cc);
+  } else {
+    const ff = Math.max(0, Math.min(f - a.agarre, tope));
+    origen = idx(ff, c);
+  }
+  if (origen === col.ultimoOrigen) return;    // no repintar si no cambió nada
+
+  const celdas = tramo(origen, a.def.largo, a.horiz);
+  if (!celdas) return;
+  col.ultimoOrigen = origen;
+  col.previa = celdas;
+  refrescarColocacion();
+}
+
+function soltarBarco(){
+  clearTimeout(col.reloj);
+  col.pendiente = null;
+  const a = col.arrastre;
+  if (!a) return;
+  col.arrastre = null;
+  col.ultimoOrigen = null;
+  $("#tabCol").classList.remove("arrastrando");
+
+  const destino = col.previa;
+  if (destino.length === a.def.largo && cabe(col.tablero, destino, ajustes.contacto)){
+    colocar(col.tablero, a.def, destino, a.horiz);
+    col.aviso = null;
+  } else {
+    // No entra: vuelve exactamente de donde salió, que seguro estaba libre.
+    colocar(col.tablero, a.def, a.previas, a.horiz);
+    col.aviso = "Ahí no entra. El <b>" + a.def.nombre + "</b> volvió a su lugar.";
+  }
+  col.previa = [];
+  col.ignorarClick = true;      // el click que sigue a la suelta no debe girar
+  refrescarColocacion();
+}
+
+/** Corta cualquier arrastre a medio hacer (al salir de la pantalla, por ejemplo). */
+function cancelarArrastre(){
+  clearTimeout(col.reloj);
+  col.pendiente = null;
+  if (col.arrastre){
+    colocar(col.tablero, col.arrastre.def, col.arrastre.previas, col.arrastre.horiz);
+    col.arrastre = null;
+    $("#tabCol").classList.remove("arrastrando");
+  }
+  col.previa = [];
+  col.ultimoOrigen = null;
 }
 
 /** Gira un barco ya desplegado y deja dicho en la ayuda qué pasó. */
@@ -1558,10 +1695,11 @@ function hojaComoJuega(){
     </div>
     <h3>En el teléfono</h3>
     <p style="font-size:14px;line-height:1.55;color:var(--soft)">
-      Para <b style="color:var(--ink)">colocar</b>: elegí el barco en la lista y tocá el mar donde va la proa.
-      Una vez que está en el agua, <b style="color:var(--ink)">tocalo de nuevo para girarlo</b> entre horizontal y
-      vertical, ahí mismo donde está — también sirve el botón <b style="color:var(--ink)">↻</b> de arriba. Para
-      mudarlo, seleccionalo en la lista y tocá el mar en otro lado. «Al azar» te lo resuelve solo.<br><br>
+      Para <b style="color:var(--ink)">colocar</b>: elegí el barco en la lista y tocá el mar donde va la proa.<br><br>
+      Una vez que está en el agua: un <b style="color:var(--ink)">toque corto lo gira</b> entre horizontal y
+      vertical, ahí mismo donde está, y <b style="color:var(--ink)">manteniéndolo apretado lo levantás</b> para
+      arrastrarlo a otro lado. Si lo soltás donde no entra, vuelve solo a su lugar. También sirve el botón
+      <b style="color:var(--ink)">↻</b> de arriba para girar, y «Al azar» para resolver la flota entera.<br><br>
       Para <b style="color:var(--ink)">disparar</b>: el primer toque apunta y el segundo confirma, así no se te
       escapa un tiro. Si te molesta, apagalo en Ajustes.
     </p>
@@ -1633,6 +1771,8 @@ $("#btnSeguir").addEventListener("click", () => {
 
 // --- colocación ---
 $("#tabCol").addEventListener("click", (e) => {
+  // El click que llega justo después de soltar un arrastre no tiene que girar.
+  if (col.ignorarClick){ col.ignorarClick = false; return; }
   const cel = e.target.closest(".celda");
   if (!cel) return;
   const i = +cel.dataset.i;
@@ -1642,7 +1782,28 @@ $("#tabCol").addEventListener("click", (e) => {
   if (n !== -1) girarDesplegado(col.tablero.barcos[n].def.id);
   else tocarCeldaColocacion(i);
 });
+
+$("#tabCol").addEventListener("pointerdown", (e) => {
+  if (col.arrastre || !col.tablero) return;
+  const cel = e.target.closest(".celda");
+  if (!cel) return;
+  const i = +cel.dataset.i;
+  if (col.tablero.ocupa[i] === -1) return;     // sólo se levanta lo que ya está en el agua
+  col.pendiente = { celda:i, puntero:e.pointerId, x:e.clientX, y:e.clientY };
+  clearTimeout(col.reloj);
+  col.reloj = setTimeout(alzarBarco, MS_ALZAR);
+});
+
 $("#tabCol").addEventListener("pointermove", (e) => {
+  if (col.arrastre){ arrastrarBarco(e.clientX, e.clientY); return; }
+
+  // Si el dedo se corre antes de tiempo era un scroll, no un mantener apretado.
+  if (col.pendiente){
+    const d = Math.hypot(e.clientX - col.pendiente.x, e.clientY - col.pendiente.y);
+    if (d > PIXELES_CANCELA){ clearTimeout(col.reloj); col.pendiente = null; }
+    return;
+  }
+
   if (e.pointerType !== "mouse") return;      // en táctil no hay hover que valga
   const cel = e.target.closest(".celda");
   const def = FLOTA.find(d => d.id === col.seleccion);
@@ -1651,8 +1812,19 @@ $("#tabCol").addEventListener("pointermove", (e) => {
   col.previa = celdas || [];
   refrescarColocacion();
 });
+
+$("#tabCol").addEventListener("pointerup", soltarBarco);
+$("#tabCol").addEventListener("pointercancel", () => { cancelarArrastre(); refrescarColocacion(); });
+
+// Mientras se arrastra, el dedo no tiene que hacer scrollear la página.
+$("#tabCol").addEventListener("touchmove", (e) => {
+  if (col.arrastre) e.preventDefault();
+}, { passive:false });
+// Sostener el dedo sobre el tablero no debe abrir el menú de iOS.
+$("#tabCol").addEventListener("contextmenu", (e) => e.preventDefault());
+
 $("#tabCol").addEventListener("pointerleave", () => {
-  if (!col.previa.length) return;
+  if (col.arrastre || !col.previa.length) return;
   col.previa = []; refrescarColocacion();
 });
 
@@ -1696,9 +1868,13 @@ $("#colAzar").addEventListener("click", () => {
   refrescarColocacion();
 });
 
-$("#colVolver").addEventListener("click", () => { G = null; mostrar("pMenu"); refrescarMenu(); });
+$("#colVolver").addEventListener("click", () => {
+  cancelarArrastre();
+  G = null; mostrar("pMenu"); refrescarMenu();
+});
 
 $("#colListo").addEventListener("click", () => {
+  cancelarArrastre();
   const k = G.colocando;
   G.tableros[k] = col.tablero;
 

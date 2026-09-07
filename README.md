@@ -71,6 +71,8 @@ node test.mjs
 
 Cubre despliegue automático (400 tableros por cada regla de contacto), límites de la grilla, disparos y hundimiento, el giro en el lugar (incluido el deslizamiento contra el borde y el caso en que no entra), las tres IAs jugando 400 partidas cada una hasta terminar, la regla de contacto y la reindexación al levantar un barco.
 
+El arrastre se prueba aparte, en el navegador, disparando eventos de puntero reales: mudar un barco, rebotar contra otro, pegarse al borde, que un toque corto siga girando, que correr el dedo enseguida cancele, y que irse de la pantalla a mitad de un arrastre no pierda el barco.
+
 El *ladder* de dificultad se mide con el generador de azar sembrado: con partidas al azar los rangos de normal y difícil casi se tocan y el test daba rojos falsos.
 
 `test.mjs` no duplica la lógica: la recorta del propio `index.html` y la importa como módulo, así no se puede desincronizar de lo que se publica.
@@ -80,9 +82,13 @@ El *ladder* de dificultad se mide con el generador de azar sembrado: con partida
 Todo con un dedo, sin arrastrar:
 
 - **Ubicar** — elegís el barco en la lista y tocás el mar donde va la proa.
-- **Girar** — tocás un barco que ya está en el agua y gira ahí mismo, entre horizontal y vertical. Pivota sobre la proa y, si el borde no lo deja, se desliza solo hasta encontrar lugar; si de verdad no entra, queda como estaba y lo dice. También sirve el botón ↻ de arriba, y volver a tocar la fila del barco seleccionado en la lista.
-- **Mover** — lo seleccionás en la lista y tocás el mar en otro lado.
+- **Girar** — un toque corto sobre un barco que ya está en el agua lo gira ahí mismo, entre horizontal y vertical. Pivota sobre la proa y, si el borde no lo deja, se desliza solo hasta encontrar lugar; si de verdad no entra, queda como estaba y lo dice. También sirve el botón ↻ de arriba, y volver a tocar la fila del barco seleccionado en la lista.
+- **Mover** — mantenés el dedo apretado sobre el barco y lo arrastrás. Si lo soltás donde no entra, vuelve solo a su lugar.
 - **Al azar** — resuelve la flota entera.
+
+El arrastre va **encajado a la grilla**: el barco salta de casillero en casillero en vez de flotar libre, que en un tablero se siente mejor y no deja sueltas ambiguas. Se implementa levantando el barco del modelo y reusando el fantasma de previsualización, así el estado no se duplica. El barco recuerda por qué parte lo agarraste, se pega al borde en lugar de salirse, y si lo soltás donde está ocupado se pinta entero de rojo antes de volver a su sitio.
+
+Dos detalles que hacen que no moleste: si el dedo se corre más de 10px antes de los 380ms, se cancela — era un scroll, no un mantener apretado; y el `click` que llega después de soltar se ignora, para que la suelta no dispare además un giro.
 
 Los barcos se dibujan como siluetas continuas en una capa SVG por encima de la grilla, no casillero por casillero: por eso un portaaviones se ve como un portaaviones y no como cinco cuadrados.
 
