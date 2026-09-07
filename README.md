@@ -88,7 +88,7 @@ Los barcos se dibujan como siluetas continuas en una capa SVG por encima de la g
 
 ## Notas
 
-- La versión está en la constante `VERSION` arriba del script, y también en el nombre del caché de `sw.js`. Hay que subir las dos juntas en cada push, si no el service worker sirve la versión vieja.
+- La versión está en la constante `VERSION` arriba del script, y también en el nombre del caché de `sw.js`. Hay que subir las dos juntas en cada push, si no el service worker sirve la versión vieja. En el menú se muestra como chip debajo del logo, así se ve de una si el teléfono quedó con una versión cacheada.
 - El tamaño del tablero sale de la constante `N` y nada más: la grilla CSS lo toma por la variable `--n` y las letras de las columnas salen de `LETRAS`. Para cambiarlo alcanza con tocar `N` (y que `LETRAS` tenga suficientes).
 - Los barcos se ubican midiendo las celdas en píxeles, así que hay que pintar con la pantalla ya visible: si se pinta oculta, todo mide cero y la capa sale vacía. Un `ResizeObserver` los reacomoda si cambia el tamaño.
 - El mar del tablero no cambia con el tema: se lee igual en claro y en oscuro.

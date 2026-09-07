@@ -86,6 +86,12 @@
   .hero .logo{font-family:var(--disp); font-size:52px; letter-spacing:.14em; text-transform:uppercase; line-height:1; margin:0;}
   .hero .sub{color:var(--soft); font-size:13px; letter-spacing:.18em; text-transform:uppercase; margin-top:6px;}
   .hero svg{margin:14px auto 0; display:block;}
+  .hero .ver{
+    display:inline-block; margin-top:13px;
+    font-family:var(--mono); font-size:11px; letter-spacing:.06em;
+    color:var(--soft); background:var(--sunk); border:1px solid var(--line);
+    padding:3px 11px; border-radius:20px;
+  }
 
   .menu{display:flex; flex-direction:column; gap:10px;}
   .opcion{
@@ -304,6 +310,7 @@
       <path d="M2 12c6-5 12-5 18 0s12 5 18 0 12-5 18 0 12 5 18 0 12-5 18 0 12 5 18 0 12-5 18 0"
             stroke="var(--faint)" stroke-width="2.5" stroke-linecap="round"/>
     </svg>
+    <div><span class="ver" id="verLabel"></span></div>
   </div>
 
   <div class="menu">
@@ -330,7 +337,7 @@
   </div>
 
   <div class="pie">
-    <span id="verLabel"></span> · <button id="btnComoJuega">cómo se juega</button>
+    <button id="btnComoJuega">cómo se juega</button>
   </div>
 </section>
 
@@ -432,7 +439,7 @@
 
 <script>
 "use strict";
-const VERSION = "v1.1.0";
+const VERSION = "v1.1.1";
 
 /* ==================================================================
    Modelo
