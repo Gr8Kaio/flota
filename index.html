@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Flota</title>
+<meta name="theme-color" content="#0E2A3D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Flota">
+<link rel="icon" href="data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'><rect%20width='64'%20height='64'%20rx='14'%20fill='%230E2A3D'/><path%20d='M10%2042h44l-6%2011H16z'%20fill='%23D9C9A8'/><rect%20x='30'%20y='14'%20width='3'%20height='28'%20fill='%23D9C9A8'/><path%20d='M33%2016l14%209-14%209z'%20fill='%23C1462E'/><path%20d='M6%2049c4-3%208-3%2012%200s8%203%2012%200%208-3%2012%200%208%203%2012%200'%20stroke='%234FA3C4'%20stroke-width='3'%20fill='none'%20stroke-linecap='round'/></svg>">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href='data:application/manifest+json,{"name":"Flota","short_name":"Flota","lang":"es","start_url":".","display":"standalone","orientation":"portrait","background_color":"%23F2F5F7","theme_color":"%230E2A3D"}'>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Barlow:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F2F5F7; --raised:#FFFFFF; --sunk:#E5EBEF;
+    --ink:#12212B; --soft:#5C7183; --faint:#8DA1B0;
+    --accent:#0E2A3D; --accent-ink:#FFFFFF; --accent-dim:#DCE7EE;
+    --naval:#1B4965; --naval-ink:#FFFFFF;
+    --sand:#C9A227; --sand-dim:#F6EDD2;
+    --fuego:#C1462E; --fuego-dim:#F7DED8;
+    --ok:#2E7D5B;
+    --line:#D5DEE4; --radius:14px;
+    --shadow:0 1px 2px rgba(18,33,43,.06), 0 12px 30px -18px rgba(18,33,43,.35);
+    --sans:'Barlow',system-ui,-apple-system,sans-serif;
+    --disp:'Oswald',Impact,sans-serif;
+    --mono:'Roboto Mono',ui-monospace,Menlo,Consolas,monospace;
+    /* El mar no cambia con el tema: el tablero tiene que leerse igual siempre. */
+    --mar-1:#17435F; --mar-2:#0F3049; --mar-linea:rgba(255,255,255,.09);
+    --casco:#B9C6CF; --casco-borde:#7E909D;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0B1218; --raised:#131E27; --sunk:#0A1016;
+    --ink:#E6EDF2; --soft:#93A6B4; --faint:#63798A;
+    --accent:#123243; --accent-ink:#FFFFFF; --accent-dim:#122B38;
+    --naval:#2A6E92; --naval-ink:#FFFFFF;
+    --sand:#E0BC46; --sand-dim:#2B2617;
+    --fuego:#E4674C; --fuego-dim:#2E1712;
+    --ok:#4CB37E;
+    --line:#22323E;
+    --shadow:0 1px 2px rgba(0,0,0,.35), 0 12px 30px -18px rgba(0,0,0,.8);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0B1218; --raised:#131E27; --sunk:#0A1016;
+      --ink:#E6EDF2; --soft:#93A6B4; --faint:#63798A;
+      --accent:#123243; --accent-ink:#FFFFFF; --accent-dim:#122B38;
+      --naval:#2A6E92; --naval-ink:#FFFFFF;
+      --sand:#E0BC46; --sand-dim:#2B2617;
+      --fuego:#E4674C; --fuego-dim:#2E1712;
+      --ok:#4CB37E;
+      --line:#22323E;
+      --shadow:0 1px 2px rgba(0,0,0,.35), 0 12px 30px -18px rgba(0,0,0,.8);
+    }
+  }
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; height:100%; overscroll-behavior:none;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:var(--sans); font-size:16px; line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    user-select:none; -webkit-user-select:none;
+  }
+  button{font:inherit; color:inherit; cursor:pointer;}
+
+  /* ---------- estructura ---------- */
+  .pantalla{display:none; flex-direction:column; min-height:100dvh; max-width:520px; margin:0 auto; padding:14px 16px 24px;}
+  .pantalla.activa{display:flex;}
+
+  .barra{display:flex; align-items:center; gap:10px; margin-bottom:12px; min-height:38px;}
+  .barra h1{font-family:var(--disp); font-size:21px; letter-spacing:.06em; text-transform:uppercase; margin:0; flex:1;}
+  .iconbtn{
+    background:var(--raised); border:1px solid var(--line); border-radius:10px;
+    width:38px; height:38px; display:grid; place-items:center; font-size:16px; padding:0;
+    box-shadow:var(--shadow); flex:none;
+  }
+  .iconbtn:active{transform:scale(.94);}
+
+  /* ---------- menú ---------- */
+  .hero{text-align:center; padding:20px 0 24px;}
+  .hero .logo{font-family:var(--disp); font-size:52px; letter-spacing:.14em; text-transform:uppercase; line-height:1; margin:0;}
+  .hero .sub{color:var(--soft); font-size:13px; letter-spacing:.18em; text-transform:uppercase; margin-top:6px;}
+  .hero svg{margin:14px auto 0; display:block;}
+
+  .menu{display:flex; flex-direction:column; gap:10px;}
+  .opcion{
+    display:flex; align-items:center; gap:13px; width:100%; text-align:left;
+    background:var(--raised); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px 15px; box-shadow:var(--shadow); transition:transform .12s;
+  }
+  .opcion:active{transform:scale(.985);}
+  .opcion .ic{
+    width:42px; height:42px; flex:none; border-radius:11px; display:grid; place-items:center;
+    background:var(--accent-dim); font-size:20px;
+  }
+  .opcion[hidden]{display:none;}
+  .opcion .tx{flex:1; min-width:0;}
+  .opcion .tt{display:block; font-weight:600; font-size:16px; line-height:1.25;}
+  .opcion .dd{display:block; color:var(--soft); font-size:13px; line-height:1.3;}
+  .opcion.primaria{background:var(--naval); border-color:var(--naval); color:var(--naval-ink);}
+  .opcion.primaria .dd{color:rgba(255,255,255,.72);}
+  .opcion.primaria .ic{background:rgba(255,255,255,.14);}
+
+  /* ---------- tablero ---------- */
+  .tablerowrap{position:relative;}
+  .tablero{
+    display:grid; grid-template-columns:15px repeat(10,1fr); grid-template-rows:15px repeat(10,1fr);
+    gap:2px; width:100%; aspect-ratio:1/1; touch-action:manipulation;
+  }
+  .tablero.chico{gap:1.5px; grid-template-columns:11px repeat(10,1fr); grid-template-rows:11px repeat(10,1fr);}
+  .rot{font-family:var(--mono); font-size:9px; color:var(--faint); display:grid; place-items:center; line-height:1;}
+  .tablero.chico .rot{font-size:7px;}
+  .celda{
+    position:relative; border-radius:3px; display:grid; place-items:center;
+    background:linear-gradient(155deg,var(--mar-1),var(--mar-2));
+    box-shadow:inset 0 0 0 1px var(--mar-linea);
+    font-size:13px; line-height:1;
+  }
+  .tablero.chico .celda{border-radius:2px; font-size:8px;}
+  .celda.barco{background:linear-gradient(155deg,var(--casco),#93A5B1); box-shadow:inset 0 0 0 1px var(--casco-borde);}
+  .celda.agua::after{
+    content:""; width:26%; height:26%; border-radius:50%;
+    background:rgba(255,255,255,.40); box-shadow:0 0 0 2px rgba(255,255,255,.12);
+  }
+  .celda.tocado{background:linear-gradient(155deg,#D6543A,#B03B25);}
+  .celda.tocado::after{content:"\2715"; color:#fff; font-weight:700; font-size:.9em;}
+  .celda.hundido{background:linear-gradient(155deg,#8C2E1C,#5A1B10); box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);}
+  .celda.hundido::after{content:"\2715"; color:rgba(255,255,255,.5); font-weight:700; font-size:.9em;}
+  .celda.ultimo{outline:2px solid var(--sand); outline-offset:-1px; z-index:1;}
+  .celda.mira{outline:2px solid var(--sand); outline-offset:-1px; z-index:1; background:linear-gradient(155deg,#245C7E,#173D57);}
+  .celda.mira::before{
+    content:""; position:absolute; inset:24%; border:2px solid var(--sand); border-radius:50%;
+    animation:pulso 1.1s ease-in-out infinite;
+  }
+  @keyframes pulso{0%,100%{opacity:.4; transform:scale(.84);} 50%{opacity:1; transform:scale(1.05);}}
+  .celda.previa{background:linear-gradient(155deg,#4E8F6B,#2E6B4C); box-shadow:inset 0 0 0 1px rgba(255,255,255,.28);}
+  .celda.previamal{background:linear-gradient(155deg,#B8442E,#7E2A1B); box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);}
+
+  .tablero.bloqueado{opacity:.6; pointer-events:none;}
+
+  /* ---------- juego ---------- */
+  .marcador{
+    display:flex; align-items:center; gap:8px; background:var(--raised); border:1px solid var(--line);
+    border-radius:12px; padding:9px 12px; margin-bottom:11px; box-shadow:var(--shadow);
+  }
+  .marcador .quien{font-family:var(--disp); text-transform:uppercase; letter-spacing:.05em; font-size:15px; flex:1; min-width:0;}
+  .marcador .pill{
+    font-family:var(--mono); font-size:11px; padding:3px 8px; border-radius:20px; flex:none;
+    background:var(--accent-dim); color:var(--ink);
+  }
+
+  .rotulo{
+    display:flex; align-items:baseline; gap:8px; margin:0 0 6px;
+    font-family:var(--disp); text-transform:uppercase; letter-spacing:.08em; font-size:12.5px; color:var(--soft);
+  }
+  .rotulo .cnt{font-family:var(--mono); font-size:11px; margin-left:auto; letter-spacing:0;}
+
+  .flotitas{display:flex; gap:5px; flex-wrap:wrap; margin:8px 0 0;}
+  .flotita{
+    font-size:11px; font-family:var(--mono);
+    padding:3px 7px; border-radius:20px; background:var(--sunk); color:var(--soft);
+  }
+  .flotita.muerto{background:var(--fuego-dim); color:var(--fuego); text-decoration:line-through;}
+
+  .propio{margin-top:14px; display:flex; gap:12px; align-items:flex-start;}
+  .propio .mini{width:44%; max-width:200px; flex:none;}
+  .propio .lado{flex:1; min-width:0;}
+
+  .accion{margin-top:14px; display:flex; gap:10px;}
+  .btn{
+    flex:1; background:var(--naval); color:var(--naval-ink); border:1px solid var(--naval);
+    border-radius:12px; padding:14px 16px; font-weight:600; font-size:16px;
+    box-shadow:var(--shadow); transition:transform .12s;
+  }
+  .btn:active{transform:scale(.98);}
+  .btn:disabled{opacity:.38; box-shadow:none;}
+  .btn.sec{background:var(--raised); color:var(--ink); border-color:var(--line);}
+
+  .bitacora{
+    margin-top:13px; background:var(--raised); border:1px solid var(--line); border-radius:12px;
+    padding:4px 12px; font-family:var(--mono); font-size:12px; color:var(--soft);
+    max-height:96px; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  .bitacora div{padding:5px 0; border-bottom:1px solid var(--line);}
+  .bitacora div:last-child{border-bottom:0;}
+  .bitacora b{color:var(--ink); font-weight:500;}
+  .bitacora .h{color:var(--fuego); font-weight:500;}
+
+  /* ---------- colocación ---------- */
+  .dique{display:flex; flex-direction:column; gap:7px; margin-top:13px;}
+  .barcofila{
+    display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:11px;
+    background:var(--raised); border:1px solid var(--line); box-shadow:var(--shadow); width:100%; text-align:left;
+  }
+  .barcofila.sel{border-color:var(--sand); background:var(--sand-dim);}
+  .barcofila.listo{opacity:.55;}
+  .barcofila .nom{flex:1; font-weight:500; font-size:14px; min-width:0;}
+  .barcofila .casillas{display:flex; gap:2px; flex:none;}
+  .barcofila .casillas i{
+    width:12px; height:12px; border-radius:2px; display:block;
+    background:linear-gradient(155deg,var(--casco),#93A5B1); box-shadow:inset 0 0 0 1px var(--casco-borde);
+  }
+  .barcofila.listo .casillas i{background:var(--sunk); box-shadow:inset 0 0 0 1px var(--line);}
+  .barcofila .marca{color:var(--ok); font-size:14px; font-weight:700; flex:none; width:14px; text-align:center;}
+
+  .ayuda{
+    margin-top:11px; font-size:13px; color:var(--soft); text-align:center; line-height:1.4; min-height:36px;
+  }
+  .ayuda b{color:var(--ink); font-weight:600;}
+
+  /* ---------- velo de traspaso ---------- */
+  .velo{
+    position:fixed; inset:0; z-index:50; display:none; place-items:center; padding:26px;
+    background:var(--accent); color:#fff; text-align:center;
+  }
+  .velo.activo{display:grid;}
+  .velo .vt{font-family:var(--disp); font-size:14px; letter-spacing:.2em; text-transform:uppercase; opacity:.6;}
+  .velo .vn{font-family:var(--disp); font-size:38px; letter-spacing:.05em; text-transform:uppercase; margin:6px 0 14px; line-height:1.05;}
+  .velo .vd{font-size:15px; opacity:.82; max-width:300px; margin:0 auto; line-height:1.45;}
+  .velo .vtap{margin-top:30px; font-size:12px; letter-spacing:.18em; text-transform:uppercase; opacity:.55; animation:parpadeo 1.7s ease-in-out infinite;}
+  @keyframes parpadeo{0%,100%{opacity:.28;} 50%{opacity:.8;}}
+
+  /* ---------- hoja inferior ---------- */
+  .hoja{
+    position:fixed; inset:0; z-index:60; display:none; align-items:flex-end; justify-content:center;
+    background:rgba(9,18,25,.5);
+  }
+  .hoja.activa{display:flex;}
+  .hoja .caja{
+    background:var(--bg); border-radius:20px 20px 0 0; width:100%; max-width:520px;
+    padding:8px 16px calc(20px + env(safe-area-inset-bottom)); max-height:88dvh; overflow-y:auto;
+    animation:subir .22s ease;
+  }
+  @keyframes subir{from{transform:translateY(24px); opacity:.4;} to{transform:none; opacity:1;}}
+  .hoja .tirador{width:38px; height:4px; border-radius:4px; background:var(--line); margin:6px auto 14px;}
+  .hoja h2{font-family:var(--disp); text-transform:uppercase; letter-spacing:.07em; font-size:18px; margin:0 0 6px;}
+  .hoja h3{font-family:var(--disp); text-transform:uppercase; letter-spacing:.07em; font-size:13px; color:var(--soft); margin:18px 0 6px;}
+
+  .campo{display:flex; align-items:center; gap:12px; padding:11px 0; border-bottom:1px solid var(--line);}
+  .campo:last-child{border-bottom:0;}
+  .campo .et{flex:1; min-width:0;}
+  .campo .et .n{display:block; font-weight:500; font-size:15px; line-height:1.25;}
+  .campo .et .d{display:block; color:var(--soft); font-size:12.5px; line-height:1.3;}
+  .segm{display:flex; background:var(--sunk); border-radius:9px; padding:2px; gap:2px; flex:none;}
+  .segm button{
+    border:0; background:none; padding:6px 10px; border-radius:7px; font-size:13px; font-weight:500; color:var(--soft);
+  }
+  .segm button.on{background:var(--raised); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.12);}
+  .sw{
+    width:46px; height:28px; border-radius:20px; background:var(--line); border:0; padding:0;
+    position:relative; flex:none; transition:background .18s;
+  }
+  .sw::after{
+    content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%;
+    background:#fff; transition:transform .18s; box-shadow:0 1px 3px rgba(0,0,0,.28);
+  }
+  .sw.on{background:var(--ok);}
+  .sw.on::after{transform:translateX(18px);}
+  .txt{
+    background:var(--raised); border:1px solid var(--line); border-radius:9px; padding:8px 10px;
+    font:inherit; font-size:15px; color:var(--ink); width:130px; flex:none;
+  }
+
+  .stats{display:grid; grid-template-columns:1fr 1fr; gap:9px;}
+  .stat{background:var(--raised); border:1px solid var(--line); border-radius:12px; padding:11px 13px;}
+  .stat .v{font-family:var(--disp); font-size:26px; line-height:1;}
+  .stat .k{color:var(--soft); font-size:11px; text-transform:uppercase; letter-spacing:.07em; margin-top:3px;}
+
+  /* ---------- fin ---------- */
+  .fin{text-align:center; padding:10px 0 2px;}
+  .fin .cinta{font-family:var(--disp); font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:var(--soft);}
+  .fin .tit{font-family:var(--disp); font-size:42px; text-transform:uppercase; letter-spacing:.04em; line-height:1.05; margin:6px 0 8px;}
+  .fin .tit.gano{color:var(--ok);}
+  .fin .tit.perdio{color:var(--fuego);}
+  .fin .res{color:var(--soft); font-size:14px;}
+
+  .dostableros{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px;}
+
+  .pie{margin-top:auto; padding-top:18px; text-align:center; color:var(--faint); font-family:var(--mono); font-size:11px;}
+  .pie button{background:none; border:0; color:inherit; font:inherit; text-decoration:underline; padding:0;}
+</style>
+</head>
+<body>
+
+<!-- ============ MENÚ ============ -->
+<section id="pMenu" class="pantalla activa">
+  <div class="hero">
+    <p class="logo">Flota</p>
+    <p class="sub">Batalla naval</p>
+    <svg width="140" height="18" viewBox="0 0 140 18" fill="none" aria-hidden="true">
+      <path d="M2 12c6-5 12-5 18 0s12 5 18 0 12-5 18 0 12 5 18 0 12-5 18 0 12 5 18 0 12-5 18 0"
+            stroke="var(--faint)" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>
+  </div>
+
+  <div class="menu">
+    <button class="opcion primaria" id="btnSeguir" hidden>
+      <span class="ic">&#9654;</span>
+      <span class="tx"><span class="tt">Continuar</span><span class="dd" id="seguirDesc">Partida en curso</span></span>
+    </button>
+    <button class="opcion primaria" data-modo="ia">
+      <span class="ic">&#9673;</span>
+      <span class="tx"><span class="tt">Contra la máquina</span><span class="dd" id="descIA">Un jugador</span></span>
+    </button>
+    <button class="opcion" data-modo="dos">
+      <span class="ic">&#9635;</span>
+      <span class="tx"><span class="tt">Pasando el teléfono</span><span class="dd">Dos jugadores, un dispositivo</span></span>
+    </button>
+    <button class="opcion" id="btnAjustes">
+      <span class="ic">&#9881;</span>
+      <span class="tx"><span class="tt">Ajustes</span><span class="dd">Dificultad, reglas, nombres</span></span>
+    </button>
+    <button class="opcion" id="btnStats">
+      <span class="ic">&#9776;</span>
+      <span class="tx"><span class="tt">Estadísticas</span><span class="dd" id="descStats">Todavía sin partidas</span></span>
+    </button>
+  </div>
+
+  <div class="pie">
+    <span id="verLabel"></span> · <button id="btnComoJuega">cómo se juega</button>
+  </div>
+</section>
+
+<!-- ============ COLOCACIÓN ============ -->
+<section id="pColocar" class="pantalla">
+  <div class="barra">
+    <button class="iconbtn" id="colVolver" title="Volver">&#8592;</button>
+    <h1 id="colTitulo">Desplegá tu flota</h1>
+    <button class="iconbtn" id="colRotar" title="Rotar">&#8635;</button>
+  </div>
+
+  <div class="tablerowrap"><div class="tablero" id="tabCol"></div></div>
+
+  <p class="ayuda" id="colAyuda">Elegí un barco y tocá el mar para ubicarlo.</p>
+
+  <div class="dique" id="dique"></div>
+
+  <div class="accion">
+    <button class="btn sec" id="colAzar">Al azar</button>
+    <button class="btn" id="colListo" disabled>Zarpar</button>
+  </div>
+</section>
+
+<!-- ============ JUEGO ============ -->
+<section id="pJuego" class="pantalla">
+  <div class="barra">
+    <button class="iconbtn" id="jugVolver" title="Menú">&#8592;</button>
+    <h1 id="jugTitulo">Flota</h1>
+    <button class="iconbtn" id="jugAyudaBtn" title="Ayuda">?</button>
+  </div>
+
+  <div class="marcador">
+    <span class="quien" id="jugTurno">Tu turno</span>
+    <span class="pill" id="jugPrecision">0%</span>
+  </div>
+
+  <div class="rotulo"><span id="rotEnemigo">Aguas enemigas</span><span class="cnt" id="cntEnemigo"></span></div>
+  <div class="tablerowrap"><div class="tablero" id="tabEnemigo"></div></div>
+  <div class="flotitas" id="flotaEnemiga"></div>
+
+  <div class="accion">
+    <button class="btn" id="btnDisparar" disabled>Elegí un blanco</button>
+  </div>
+
+  <div class="propio">
+    <div class="mini">
+      <div class="rotulo"><span>Tu flota</span></div>
+      <div class="tablerowrap"><div class="tablero chico" id="tabPropio"></div></div>
+    </div>
+    <div class="lado">
+      <div class="rotulo"><span>Bitácora</span></div>
+      <div class="bitacora" id="bitacora"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FIN ============ -->
+<section id="pFin" class="pantalla">
+  <div class="fin">
+    <p class="cinta" id="finCinta">Fin de la batalla</p>
+    <p class="tit" id="finTitulo">Victoria</p>
+    <p class="res" id="finResumen"></p>
+  </div>
+
+  <div class="dostableros">
+    <div>
+      <div class="rotulo"><span id="finRotA">Tu flota</span></div>
+      <div class="tablerowrap"><div class="tablero chico" id="tabFinA"></div></div>
+    </div>
+    <div>
+      <div class="rotulo"><span id="finRotB">Rival</span></div>
+      <div class="tablerowrap"><div class="tablero chico" id="tabFinB"></div></div>
+    </div>
+  </div>
+
+  <div class="accion">
+    <button class="btn sec" id="finMenu">Menú</button>
+    <button class="btn" id="finRevancha">Revancha</button>
+  </div>
+</section>
+
+<!-- ============ VELO DE TRASPASO ============ -->
+<div class="velo" id="velo">
+  <div>
+    <p class="vt" id="veloTope">Pasá el teléfono</p>
+    <p class="vn" id="veloNombre">Jugador 2</p>
+    <p class="vd" id="veloDetalle">Tocá cuando lo tengas en la mano.</p>
+    <p class="vtap">Tocá para seguir</p>
+  </div>
+</div>
+
+<!-- ============ HOJA ============ -->
+<div class="hoja" id="hoja">
+  <div class="caja" id="hojaCaja">
+    <div class="tirador"></div>
+    <div id="hojaCuerpo"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const VERSION = "v1.0.0";
+
+/* ==================================================================
+   Modelo
+   ================================================================== */
+
+const N = 10;                       // lado del tablero
+const TOT = N * N;
+const LETRAS = "ABCDEFGHIJ";
+
+const FLOTA = [
+  { id:"portaaviones", nombre:"Portaaviones", largo:5 },
+  { id:"acorazado",    nombre:"Acorazado",    largo:4 },
+  { id:"crucero",      nombre:"Crucero",      largo:3 },
+  { id:"submarino",    nombre:"Submarino",    largo:3 },
+  { id:"destructor",   nombre:"Destructor",   largo:2 },
+];
+const CASCO_TOTAL = FLOTA.reduce((a,b) => a + b.largo, 0);   // 17
+
+// disparos[i]: 0 sin tocar · 1 agua · 2 impacto
+const SIN = 0, AGUA = 1, IMPACTO = 2;
+
+const rc  = (i) => [Math.floor(i / N), i % N];
+const idx = (f, c) => f * N + c;
+const coord = (i) => LETRAS[i % N] + (Math.floor(i / N) + 1);
+const dentro = (f, c) => f >= 0 && f < N && c >= 0 && c < N;
+
+function nuevoTablero(){
+  return {
+    barcos: [],                       // { def, celdas[], horiz, impactos, hundido }
+    ocupa: new Array(TOT).fill(-1),   // índice del barco, o -1
+    disparos: new Array(TOT).fill(SIN),
+  };
+}
+
+/** Celdas que ocuparía un barco de `largo` puesto en `i`. null si se sale. */
+function tramo(i, largo, horiz){
+  const [f, c] = rc(i);
+  const cs = [];
+  for (let k = 0; k < largo; k++){
+    const ff = horiz ? f : f + k;
+    const cc = horiz ? c + k : c;
+    if (!dentro(ff, cc)) return null;
+    cs.push(idx(ff, cc));
+  }
+  return cs;
+}
+
+/** ¿Se puede apoyar ahí? Respeta la regla de contacto de los ajustes. */
+function cabe(t, celdas, permiteContacto){
+  for (const cel of celdas){
+    if (t.ocupa[cel] !== -1) return false;
+    if (permiteContacto) continue;
+    const [f, c] = rc(cel);
+    for (let df = -1; df <= 1; df++){
+      for (let dc = -1; dc <= 1; dc++){
+        const ff = f + df, cc = c + dc;
+        if (!dentro(ff, cc)) continue;
+        const v = idx(ff, cc);
+        if (t.ocupa[v] !== -1 && !celdas.includes(v)) return false;
+      }
+    }
+  }
+  return true;
+}
+
+function colocar(t, def, celdas, horiz){
+  const barco = { def, celdas, horiz, impactos:0, hundido:false };
+  t.barcos.push(barco);
+  const n = t.barcos.length - 1;
+  for (const cel of celdas) t.ocupa[cel] = n;
+  return barco;
+}
+
+function quitarBarco(t, id){
+  const n = t.barcos.findIndex(b => b.def.id === id);
+  if (n === -1) return;
+  t.barcos.splice(n, 1);
+  t.ocupa.fill(-1);
+  t.barcos.forEach((b, k) => b.celdas.forEach(cel => { t.ocupa[cel] = k; }));
+}
+
+/** Despliegue automático. Reintenta desde cero si se traba. */
+function desplegarAlAzar(permiteContacto){
+  for (let intento = 0; intento < 200; intento++){
+    const t = nuevoTablero();
+    let ok = true;
+    for (const def of FLOTA){
+      let puesto = false;
+      for (let k = 0; k < 400 && !puesto; k++){
+        const horiz = Math.random() < 0.5;
+        const celdas = tramo(Math.floor(Math.random() * TOT), def.largo, horiz);
+        if (celdas && cabe(t, celdas, permiteContacto)){ colocar(t, def, celdas, horiz); puesto = true; }
+      }
+      if (!puesto){ ok = false; break; }
+    }
+    if (ok) return t;
+  }
+  // Sin salida con la regla estricta: aflojamos antes que dejar al jugador colgado.
+  return desplegarAlAzar(true);
+}
+
+/** Aplica un disparo. Devuelve qué pasó. */
+function disparar(t, i){
+  if (t.disparos[i] !== SIN) return { repetido:true };
+  const n = t.ocupa[i];
+  if (n === -1){ t.disparos[i] = AGUA; return { agua:true }; }
+  t.disparos[i] = IMPACTO;
+  const b = t.barcos[n];
+  b.impactos++;
+  if (b.impactos >= b.def.largo){
+    b.hundido = true;
+    return { impacto:true, hundido:b };
+  }
+  return { impacto:true };
+}
+
+const flotaHundida = (t) => t.barcos.every(b => b.hundido);
+const cascoRestante = (t) => t.barcos.reduce((a,b) => a + (b.def.largo - b.impactos), 0);
+
+/* ==================================================================
+   IA
+   ================================================================== */
+
+const libres = (t) => {
+  const r = [];
+  for (let i = 0; i < TOT; i++) if (t.disparos[i] === SIN) r.push(i);
+  return r;
+};
+
+/** Impactos que todavía no pertenecen a un barco hundido. */
+function heridasAbiertas(t){
+  const r = [];
+  for (let i = 0; i < TOT; i++){
+    if (t.disparos[i] !== IMPACTO) continue;
+    const n = t.ocupa[i];
+    if (n !== -1 && !t.barcos[n].hundido) r.push(i);
+  }
+  return r;
+}
+
+/** Celdas donde con seguridad no hay nada vivo: agua, o casco ya hundido. */
+function descartadas(t){
+  const d = new Array(TOT).fill(false);
+  for (let i = 0; i < TOT; i++){
+    if (t.disparos[i] === AGUA) d[i] = true;
+    else if (t.disparos[i] === IMPACTO){
+      const n = t.ocupa[i];
+      if (n !== -1 && t.barcos[n].hundido) d[i] = true;
+    }
+  }
+  return d;
+}
+
+const barcosVivos = (t) => t.barcos.filter(b => !b.hundido).map(b => b.def.largo);
+
+/** Fácil: tira a cualquier lado. */
+function iaFacil(t){
+  const l = libres(t);
+  return l[Math.floor(Math.random() * l.length)];
+}
+
+/** Normal: dispara al azar hasta pegar, después remata alrededor y sigue la línea. */
+function iaNormal(t){
+  const heridas = heridasAbiertas(t);
+  if (heridas.length){
+    const enLinea = [], sueltos = [];
+    for (const h of heridas){
+      const [f, c] = rc(h);
+      for (const [df, dc] of [[0,1],[0,-1],[1,0],[-1,0]]){
+        const ff = f + df, cc = c + dc;
+        if (!dentro(ff, cc)) continue;
+        const v = idx(ff, cc);
+        if (t.disparos[v] !== SIN) continue;
+        // Si del lado opuesto también hay herida, la orientación ya está cantada.
+        const of_ = f - df, oc = c - dc;
+        const alineado = dentro(of_, oc) && heridas.includes(idx(of_, oc));
+        (alineado ? enLinea : sueltos).push(v);
+      }
+    }
+    const pool = enLinea.length ? enLinea : sueltos;
+    if (pool.length) return pool[Math.floor(Math.random() * pool.length)];
+  }
+  // Paridad: ningún barco mide menos de 2, así que medio tablero alcanza.
+  const l = libres(t);
+  const pares = l.filter(i => { const [f, c] = rc(i); return (f + c) % 2 === 0; });
+  const pool = pares.length ? pares : l;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/**
+ * Difícil: mapa de densidad. Cuenta en cuántas posiciones válidas de los barcos
+ * que siguen vivos entra cada celda; las que tocan una herida abierta pesan mucho más.
+ */
+function iaDificil(t){
+  const fuera = descartadas(t);
+  const heridas = heridasAbiertas(t);
+  const heridaSet = new Set(heridas);
+  const puntaje = new Float64Array(TOT);
+
+  for (const largo of barcosVivos(t)){
+    for (const horiz of [true, false]){
+      for (let i = 0; i < TOT; i++){
+        const celdas = tramo(i, largo, horiz);
+        if (!celdas) continue;
+        let valida = true, cubre = 0;
+        for (const cel of celdas){
+          if (fuera[cel]){ valida = false; break; }
+          if (heridaSet.has(cel)) cubre++;
+        }
+        if (!valida) continue;
+        // Cubrir heridas ya conocidas vale exponencialmente más que explorar.
+        const peso = cubre ? Math.pow(24, cubre) : 1;
+        for (const cel of celdas){
+          if (t.disparos[cel] === SIN) puntaje[cel] += peso;
+        }
+      }
+    }
+  }
+
+  let mejor = -1, max = -1;
+  for (let i = 0; i < TOT; i++){
+    if (t.disparos[i] !== SIN) continue;
+    if (puntaje[i] > max){ max = puntaje[i]; mejor = i; }
+  }
+  // Si el mapa quedó plano (no debería), cae en la heurística simple.
+  return max > 0 ? mejor : iaNormal(t);
+}
+
+function iaElegir(t, dificultad){
+  if (dificultad === "facil")  return iaFacil(t);
+  if (dificultad === "dificil") return iaDificil(t);
+  return iaNormal(t);
+}
+
+/* ==================================================================
+   Persistencia
+   ================================================================== */
+
+const K_AJUSTES = "flota.ajustes";
+const K_STATS   = "flota.stats";
+const K_PARTIDA = "flota.partida";
+
+const AJUSTES_DEF = {
+  dificultad: "normal",     // facil · normal · dificil
+  contacto: true,           // ¿los barcos pueden tocarse?
+  confirmar: true,          // doble paso para disparar
+  tema: "auto",             // auto · claro · oscuro
+  nombre1: "Vos",
+  nombre2: "Rival",
+};
+
+const STATS_DEF = { jugadas:0, ganadas:0, disparos:0, aciertos:0, mejorDisparos:null };
+
+function leer(clave, porDefecto){
+  try {
+    const crudo = localStorage.getItem(clave);
+    if (!crudo) return { ...porDefecto };
+    return { ...porDefecto, ...JSON.parse(crudo) };
+  } catch { return { ...porDefecto }; }
+}
+function guardar(clave, valor){
+  try { localStorage.setItem(clave, JSON.stringify(valor)); } catch {}
+}
+
+let ajustes = leer(K_AJUSTES, AJUSTES_DEF);
+let stats   = leer(K_STATS, STATS_DEF);
+
+function aplicarTema(){
+  const r = document.documentElement;
+  if (ajustes.tema === "auto") r.removeAttribute("data-theme");
+  else r.setAttribute("data-theme", ajustes.tema === "oscuro" ? "dark" : "light");
+}
+
+/* ==================================================================
+   Estado de la partida
+   ================================================================== */
+
+/*
+ * G.tableros[k] es el mar del jugador k; se dispara sobre el tablero del otro.
+ * En modo IA el jugador 0 es la persona y el 1 es la máquina.
+ */
+let G = null;
+
+function nuevaPartida(modo){
+  return {
+    modo,                              // "ia" · "dos"
+    dificultad: ajustes.dificultad,
+    nombres: modo === "ia" ? [ajustes.nombre1 || "Vos", "Máquina"]
+                           : [ajustes.nombre1 || "Jugador 1", ajustes.nombre2 || "Jugador 2"],
+    tableros: [null, null],
+    turno: 0,
+    fase: "colocar",                   // colocar · jugar · fin
+    colocando: 0,
+    disparos: [0, 0],
+    aciertos: [0, 0],
+    bitacora: [],
+    ultimo: [null, null],              // último disparo recibido en cada tablero
+    ganador: null,
+    empezada: Date.now(),
+  };
+}
+
+/* --- serialización: los barcos guardan sólo lo que no se puede recalcular --- */
+
+function serializarTablero(t){
+  return {
+    b: t.barcos.map(x => ({ i:x.def.id, c:x.celdas, h:x.horiz, k:x.impactos })),
+    d: t.disparos.join(""),
+  };
+}
+function deserializarTablero(o){
+  const t = nuevoTablero();
+  for (const x of o.b){
+    const def = FLOTA.find(d => d.id === x.i);
+    if (!def) continue;
+    const barco = colocar(t, def, x.c, x.h);
+    barco.impactos = x.k;
+    barco.hundido = x.k >= def.largo;
+  }
+  t.disparos = o.d.split("").map(Number);
+  return t;
+}
+
+function guardarPartida(){
+  if (!G || G.fase === "fin"){ try { localStorage.removeItem(K_PARTIDA); } catch {} return; }
+  guardar(K_PARTIDA, {
+    ...G,
+    tableros: G.tableros.map(t => t ? serializarTablero(t) : null),
+  });
+}
+function cargarPartida(){
+  try {
+    const crudo = localStorage.getItem(K_PARTIDA);
+    if (!crudo) return null;
+    const o = JSON.parse(crudo);
+    o.tableros = o.tableros.map(t => t ? deserializarTablero(t) : null);
+    return o;
+  } catch { return null; }
+}
+
+/* ==================================================================
+   Utilidades de UI
+   ================================================================== */
+
+const $  = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+function mostrar(id){
+  $$(".pantalla").forEach(p => p.classList.toggle("activa", p.id === id));
+  window.scrollTo(0, 0);
+}
+
+/** Construye la grilla con rótulos una sola vez; después sólo se pintan clases. */
+function armarTablero(el){
+  el.textContent = "";
+  const frag = document.createDocumentFragment();
+  const esquina = document.createElement("div");
+  esquina.className = "rot";
+  frag.appendChild(esquina);
+  for (let c = 0; c < N; c++){
+    const d = document.createElement("div");
+    d.className = "rot"; d.textContent = LETRAS[c];
+    frag.appendChild(d);
+  }
+  for (let f = 0; f < N; f++){
+    const d = document.createElement("div");
+    d.className = "rot"; d.textContent = f + 1;
+    frag.appendChild(d);
+    for (let c = 0; c < N; c++){
+      const cel = document.createElement("div");
+      cel.className = "celda";
+      cel.dataset.i = idx(f, c);
+      frag.appendChild(cel);
+    }
+  }
+  el.appendChild(frag);
+  el._celdas = Array.from(el.querySelectorAll(".celda"));
+}
+
+/**
+ * Pinta un tablero.
+ * @param {boolean} verBarcos  mostrar los cascos que todavía no fueron tocados
+ */
+function pintar(el, t, verBarcos, opciones = {}){
+  if (!el._celdas) armarTablero(el);
+  const { mira = null, ultimo = null } = opciones;
+  for (let i = 0; i < TOT; i++){
+    const cel = el._celdas[i];
+    const d = t.disparos[i];
+    const n = t.ocupa[i];
+    let cls = "celda";
+    if (d === IMPACTO) cls += (n !== -1 && t.barcos[n].hundido) ? " hundido" : " tocado";
+    else if (d === AGUA) cls += " agua";
+    else if (verBarcos && n !== -1) cls += " barco";
+    if (i === mira) cls += " mira";
+    if (i === ultimo) cls += " ultimo";
+    if (cel.className !== cls) cel.className = cls;
+  }
+}
+
+function chipsFlota(el, t){
+  el.textContent = "";
+  for (const b of t.barcos){
+    const s = document.createElement("span");
+    s.className = "flotita" + (b.hundido ? " muerto" : "");
+    s.textContent = b.def.nombre + " " + b.def.largo;
+    el.appendChild(s);
+  }
+}
+
+const pct = (a, b) => b ? Math.round(a * 100 / b) + "%" : "0%";
+
+/* ==================================================================
+   Colocación
+   ================================================================== */
+
+const col = { tablero:null, seleccion:null, horiz:true, previa:[] };
+
+function abrirColocacion(jugador){
+  G.colocando = jugador;
+  col.tablero = nuevoTablero();
+  col.seleccion = FLOTA[0].id;
+  col.horiz = true;
+  col.previa = [];
+
+  $("#colTitulo").textContent = G.modo === "dos" ? G.nombres[jugador] : "Desplegá tu flota";
+  armarTablero($("#tabCol"));
+  refrescarColocacion();
+  mostrar("pColocar");
+}
+
+function refrescarColocacion(){
+  const t = col.tablero;
+  pintar($("#tabCol"), t, true);
+
+  // previsualización del barco seleccionado
+  if (col.previa.length){
+    const def = FLOTA.find(d => d.id === col.seleccion);
+    const ok = def && cabe(t, col.previa, ajustes.contacto);
+    for (const i of col.previa){
+      $("#tabCol")._celdas[i].classList.add(ok ? "previa" : "previamal");
+    }
+  }
+
+  // dique seco
+  const dique = $("#dique");
+  dique.textContent = "";
+  for (const def of FLOTA){
+    const puesto = t.barcos.some(b => b.def.id === def.id);
+    const fila = document.createElement("button");
+    fila.className = "barcofila" + (puesto ? " listo" : "") + (col.seleccion === def.id ? " sel" : "");
+    fila.dataset.id = def.id;
+
+    const nom = document.createElement("span");
+    nom.className = "nom"; nom.textContent = def.nombre;
+
+    const cas = document.createElement("span");
+    cas.className = "casillas";
+    for (let k = 0; k < def.largo; k++) cas.appendChild(document.createElement("i"));
+
+    const marca = document.createElement("span");
+    marca.className = "marca";
+    marca.textContent = puesto ? "✓" : "";
+
+    fila.append(nom, cas, marca);
+    dique.appendChild(fila);
+  }
+
+  const faltan = FLOTA.length - t.barcos.length;
+  $("#colListo").disabled = faltan > 0;
+  $("#colListo").textContent = faltan > 0 ? "Faltan " + faltan : "Zarpar";
+
+  const sel = FLOTA.find(d => d.id === col.seleccion);
+  const yaEsta = sel && t.barcos.some(b => b.def.id === sel.id);
+  if (faltan === 0){
+    $("#colAyuda").innerHTML = "Flota completa. Tocá un barco de la lista para reubicarlo.";
+  } else if (yaEsta){
+    $("#colAyuda").innerHTML = "<b>" + sel.nombre + "</b> ya está en el agua. Tocalo de nuevo para levantarlo.";
+  } else if (sel){
+    $("#colAyuda").innerHTML = "<b>" + sel.nombre + "</b> (" + sel.largo + ") · " +
+      (col.horiz ? "horizontal" : "vertical") + " · tocá el mar para ubicarlo.";
+  }
+}
+
+function tocarCeldaColocacion(i){
+  const def = FLOTA.find(d => d.id === col.seleccion);
+  if (!def) return;
+  const t = col.tablero;
+  if (t.barcos.some(b => b.def.id === def.id)) quitarBarco(t, def.id);
+
+  const celdas = tramo(i, def.largo, col.horiz);
+  if (!celdas || !cabe(t, celdas, ajustes.contacto)){
+    $("#colAyuda").innerHTML = "Ahí no entra. " +
+      (ajustes.contacto ? "Se superpone con otro barco." : "Queda pegado a otro barco.");
+    refrescarColocacion();
+    return;
+  }
+  colocar(t, def, celdas, col.horiz);
+  col.previa = [];
+
+  // pasar sola al primero que falte agiliza mucho el despliegue
+  const siguiente = FLOTA.find(d => !t.barcos.some(b => b.def.id === d.id));
+  col.seleccion = siguiente ? siguiente.id : def.id;
+  refrescarColocacion();
+}
+
+/* ==================================================================
+   Juego
+   ================================================================== */
+
+// bloqueo: nadie puede tirar ahora. motivo: 'maquina' | 'pase'
+const jug = { mira:null, bloqueo:false, motivo:"" };
+
+function empezarJuego(){
+  G.fase = "jugar";
+  G.turno = 0;
+  jug.mira = null;
+  armarTablero($("#tabEnemigo"));
+  armarTablero($("#tabPropio"));
+  guardarPartida();
+  if (G.modo === "dos"){
+    velo(G.nombres[0], "Empieza la batalla.", () => { mostrar("pJuego"); refrescarJuego(); });
+  } else {
+    mostrar("pJuego");
+    refrescarJuego();
+  }
+}
+
+const rival = (k) => 1 - k;
+
+function refrescarJuego(){
+  const yo = G.turno;
+  const otro = rival(yo);
+  const miTablero = G.tableros[yo];
+  const suTablero = G.tableros[otro];
+
+  $("#jugTitulo").textContent = G.modo === "ia" ? "Flota" : G.nombres[yo];
+  $("#jugTurno").textContent = G.modo === "ia"
+    ? (jug.motivo === "maquina" ? "Turno de la máquina" : "Tu turno")
+    : "Turno de " + G.nombres[yo];
+  $("#jugPrecision").textContent = pct(G.aciertos[yo], G.disparos[yo]) + " · " + G.disparos[yo] + " tiros";
+
+  $("#rotEnemigo").textContent = G.modo === "ia" ? "Aguas enemigas" : "Aguas de " + G.nombres[otro];
+  $("#cntEnemigo").textContent = cascoRestante(suTablero) + "/" + CASCO_TOTAL + " casco";
+
+  pintar($("#tabEnemigo"), suTablero, false, { mira: jug.mira, ultimo: G.ultimo[otro] });
+  pintar($("#tabPropio"), miTablero, true, { ultimo: G.ultimo[yo] });
+  chipsFlota($("#flotaEnemiga"), suTablero);
+
+  $("#tabEnemigo").classList.toggle("bloqueado", jug.bloqueo);
+
+  const btn = $("#btnDisparar");
+  if (jug.bloqueo){
+    btn.disabled = true;
+    btn.textContent = jug.motivo === "maquina" ? "La máquina está apuntando…" : "Pasále el teléfono…";
+  } else if (!ajustes.confirmar){
+    btn.disabled = true;
+    btn.textContent = "Tocá una celda para disparar";
+  } else if (jug.mira === null){
+    btn.disabled = true;
+    btn.textContent = "Elegí un blanco";
+  } else {
+    btn.disabled = false;
+    btn.textContent = "Disparar a " + coord(jug.mira);
+  }
+
+  pintarBitacora();
+}
+
+function pintarBitacora(){
+  const el = $("#bitacora");
+  el.textContent = "";
+  for (const linea of G.bitacora.slice(-40).reverse()){
+    const d = document.createElement("div");
+    if (linea.golpe) d.className = "h";
+    const b = document.createElement("b");
+    b.textContent = linea.quien + " ";
+    d.append(b, document.createTextNode(linea.texto));
+    el.appendChild(d);
+  }
+}
+
+function anotar(quien, texto, golpe){
+  G.bitacora.push({ quien, texto, golpe: !!golpe });
+}
+
+function tocarCeldaEnemiga(i){
+  if (jug.bloqueo || G.fase !== "jugar") return;
+  const suTablero = G.tableros[rival(G.turno)];
+  if (suTablero.disparos[i] !== SIN) return;
+
+  if (!ajustes.confirmar){ ejecutarDisparo(i); return; }
+  // Segundo toque sobre la misma celda = confirmar. Salva del disparo accidental.
+  if (jug.mira === i){ ejecutarDisparo(i); return; }
+  jug.mira = i;
+  refrescarJuego();
+}
+
+function ejecutarDisparo(i){
+  const yo = G.turno;
+  const otro = rival(yo);
+  const t = G.tableros[otro];
+  const r = disparar(t, i);
+  if (r.repetido) return;
+
+  jug.mira = null;
+  G.disparos[yo]++;
+  G.ultimo[otro] = i;
+  if (r.impacto) G.aciertos[yo]++;
+
+  const quien = G.modo === "ia" && yo === 1 ? "Máquina" : G.nombres[yo];
+  if (r.hundido) anotar(quien, coord(i) + " · hundió el " + r.hundido.def.nombre + "!", true);
+  else if (r.impacto) anotar(quien, coord(i) + " · tocado", true);
+  else anotar(quien, coord(i) + " · agua");
+
+  if (flotaHundida(t)){ terminar(yo); return; }
+
+  // Regla clásica: acertar no da otro tiro; el turno pasa siempre.
+  if (G.modo === "ia"){
+    G.turno = otro;
+    guardarPartida();
+    if (G.turno === 1){
+      jug.bloqueo = true;
+      jug.motivo = "maquina";
+    }
+    refrescarJuego();
+    if (jug.bloqueo) setTimeout(turnoMaquina, 620 + Math.random() * 420);
+    return;
+  }
+
+  // Pasando el teléfono el turno no cambia acá: primero el que tiró tiene que
+  // ver su propio resultado, si no suelta el aparato sin saber qué pasó.
+  jug.bloqueo = true;
+  jug.motivo = "pase";
+  refrescarJuego();
+  setTimeout(() => {
+    if (!G || G.fase !== "jugar") return;      // se fue al menú mientras tanto
+    G.turno = otro;
+    jug.bloqueo = false; jug.motivo = "";
+    guardarPartida();
+    velo(G.nombres[G.turno], "Que el otro no mire.", () => refrescarJuego());
+  }, 1150);
+}
+
+function turnoMaquina(){
+  if (!G || G.fase !== "jugar"){ jug.bloqueo = false; jug.motivo = ""; return; }
+  const objetivo = iaElegir(G.tableros[0], G.dificultad);
+  jug.bloqueo = false; jug.motivo = "";
+  ejecutarDisparo(objetivo);
+}
+
+function terminar(ganador){
+  G.fase = "fin";
+  G.ganador = ganador;
+  jug.bloqueo = false; jug.motivo = "";
+  try { localStorage.removeItem(K_PARTIDA); } catch {}
+
+  if (G.modo === "ia"){
+    stats.jugadas++;
+    stats.disparos += G.disparos[0];
+    stats.aciertos += G.aciertos[0];
+    if (ganador === 0){
+      stats.ganadas++;
+      if (stats.mejorDisparos === null || G.disparos[0] < stats.mejorDisparos) stats.mejorDisparos = G.disparos[0];
+    }
+    guardar(K_STATS, stats);
+  }
+
+  const gano = G.modo === "ia" ? ganador === 0 : true;
+  $("#finCinta").textContent = G.modo === "ia" ? "Fin de la batalla" : "Fin de la batalla";
+  const tit = $("#finTitulo");
+  tit.className = "tit " + (G.modo === "ia" ? (gano ? "gano" : "perdio") : "gano");
+  tit.textContent = G.modo === "ia"
+    ? (gano ? "Victoria" : "Derrota")
+    : "Gana " + G.nombres[ganador];
+
+  const d = G.disparos[ganador], a = G.aciertos[ganador];
+  $("#finResumen").textContent = G.modo === "ia"
+    ? (gano ? "Hundiste la flota en " + d + " disparos · " + pct(a, d) + " de precisión."
+            : "La máquina te hundió en " + G.disparos[1] + " disparos.")
+    : d + " disparos · " + pct(a, d) + " de precisión.";
+
+  $("#finRotA").textContent = G.modo === "ia" ? "Tu flota" : G.nombres[0];
+  $("#finRotB").textContent = G.modo === "ia" ? "Flota enemiga" : G.nombres[1];
+  armarTablero($("#tabFinA"));
+  armarTablero($("#tabFinB"));
+  pintar($("#tabFinA"), G.tableros[0], true);
+  pintar($("#tabFinB"), G.tableros[1], true);
+
+  mostrar("pFin");
+  refrescarMenu();
+}
+
+/* ==================================================================
+   Velo de traspaso
+   ================================================================== */
+
+let veloAccion = null;
+
+function velo(nombre, detalle, alSeguir){
+  if (G && G.modo !== "dos"){ alSeguir(); return; }
+  $("#veloNombre").textContent = nombre;
+  $("#veloDetalle").textContent = detalle;
+  veloAccion = alSeguir;
+  $("#velo").classList.add("activo");
+}
+
+$("#velo").addEventListener("click", () => {
+  $("#velo").classList.remove("activo");
+  const f = veloAccion; veloAccion = null;
+  if (f) f();
+});
+
+/* ==================================================================
+   Hoja inferior
+   ================================================================== */
+
+function abrirHoja(html, alAbrir){
+  $("#hojaCuerpo").innerHTML = html;
+  $("#hoja").classList.add("activa");
+  if (alAbrir) alAbrir();
+}
+const cerrarHoja = () => $("#hoja").classList.remove("activa");
+
+$("#hoja").addEventListener("click", (e) => { if (e.target.id === "hoja") cerrarHoja(); });
+
+function hojaAjustes(){
+  abrirHoja(`
+    <h2>Ajustes</h2>
+    <h3>Partida</h3>
+    <div class="campo">
+      <span class="et"><span class="n">Dificultad</span><span class="d">Sólo contra la máquina</span></span>
+      <span class="segm" data-set="dificultad">
+        <button data-v="facil">Fácil</button><button data-v="normal">Normal</button><button data-v="dificil">Difícil</button>
+      </span>
+    </div>
+    <div class="campo">
+      <span class="et"><span class="n">Barcos pegados</span><span class="d">Si lo apagás, tienen que quedar separados por al menos una casilla</span></span>
+      <button class="sw" data-tog="contacto"></button>
+    </div>
+    <div class="campo">
+      <span class="et"><span class="n">Confirmar disparo</span><span class="d">Primer toque apunta, segundo dispara</span></span>
+      <button class="sw" data-tog="confirmar"></button>
+    </div>
+    <h3>Jugadores</h3>
+    <div class="campo">
+      <span class="et"><span class="n">Jugador 1</span></span>
+      <input class="txt" data-nom="nombre1" maxlength="14" placeholder="Vos">
+    </div>
+    <div class="campo">
+      <span class="et"><span class="n">Jugador 2</span><span class="d">Sólo pasando el teléfono</span></span>
+      <input class="txt" data-nom="nombre2" maxlength="14" placeholder="Rival">
+    </div>
+    <h3>Aspecto</h3>
+    <div class="campo">
+      <span class="et"><span class="n">Tema</span></span>
+      <span class="segm" data-set="tema">
+        <button data-v="auto">Auto</button><button data-v="claro">Claro</button><button data-v="oscuro">Oscuro</button>
+      </span>
+    </div>
+  `, sincronizarAjustes);
+}
+
+function sincronizarAjustes(){
+  $$("#hojaCuerpo .segm").forEach(g => {
+    const clave = g.dataset.set;
+    Array.from(g.children).forEach(b => b.classList.toggle("on", b.dataset.v === ajustes[clave]));
+  });
+  $$("#hojaCuerpo .sw").forEach(b => b.classList.toggle("on", !!ajustes[b.dataset.tog]));
+  $$("#hojaCuerpo .txt").forEach(inp => { inp.value = ajustes[inp.dataset.nom] || ""; });
+}
+
+$("#hojaCuerpo").addEventListener("click", (e) => {
+  const seg = e.target.closest(".segm button");
+  if (seg){
+    ajustes[seg.parentElement.dataset.set] = seg.dataset.v;
+    guardar(K_AJUSTES, ajustes); aplicarTema(); sincronizarAjustes(); refrescarMenu();
+    return;
+  }
+  const sw = e.target.closest(".sw");
+  if (sw){
+    ajustes[sw.dataset.tog] = !ajustes[sw.dataset.tog];
+    guardar(K_AJUSTES, ajustes); sincronizarAjustes();
+    if (G && G.fase === "jugar") refrescarJuego();
+  }
+});
+$("#hojaCuerpo").addEventListener("input", (e) => {
+  const inp = e.target.closest(".txt");
+  if (!inp) return;
+  ajustes[inp.dataset.nom] = inp.value.trim();
+  guardar(K_AJUSTES, ajustes);
+});
+
+function hojaStats(){
+  const s = stats;
+  const perdidas = s.jugadas - s.ganadas;
+  abrirHoja(`
+    <h2>Estadísticas</h2>
+    <p style="color:var(--soft);font-size:13px;margin:0 0 14px">Sólo cuentan las partidas contra la máquina.</p>
+    <div class="stats">
+      <div class="stat"><div class="v">${s.jugadas}</div><div class="k">Partidas</div></div>
+      <div class="stat"><div class="v">${s.jugadas ? Math.round(s.ganadas*100/s.jugadas) : 0}%</div><div class="k">Victorias</div></div>
+      <div class="stat"><div class="v">${s.ganadas}<span style="font-size:15px;color:var(--soft)"> / ${perdidas}</span></div><div class="k">Ganadas / perdidas</div></div>
+      <div class="stat"><div class="v">${pct(s.aciertos, s.disparos)}</div><div class="k">Precisión</div></div>
+      <div class="stat"><div class="v">${s.mejorDisparos ?? "—"}</div><div class="k">Mejor partida (tiros)</div></div>
+      <div class="stat"><div class="v">${s.disparos}</div><div class="k">Disparos totales</div></div>
+    </div>
+    <div class="campo" style="margin-top:16px">
+      <span class="et"><span class="n">Borrar estadísticas</span><span class="d">No se puede deshacer</span></span>
+      <button class="btn sec" id="borrarStats" style="flex:none;padding:9px 14px;font-size:14px">Borrar</button>
+    </div>
+  `, () => {
+    $("#borrarStats").addEventListener("click", () => {
+      stats = { ...STATS_DEF };
+      guardar(K_STATS, stats);
+      cerrarHoja(); refrescarMenu();
+    });
+  });
+}
+
+function hojaComoJuega(){
+  abrirHoja(`
+    <h2>Cómo se juega</h2>
+    <p style="font-size:14px;line-height:1.55;color:var(--soft)">
+      Cada uno esconde cinco barcos en una grilla de 10×10. Por turnos se canta una casilla del
+      mar del otro: o es <b style="color:var(--ink)">agua</b>, o es <b style="color:var(--ink)">tocado</b>.
+      Cuando se acierta a todas las casillas de un barco, se hunde. Gana quien hunde primero la flota entera.
+    </p>
+    <h3>La flota</h3>
+    <div class="dique" style="margin-top:0">
+      ${FLOTA.map(d => `<div class="barcofila"><span class="nom">${d.nombre}</span>
+        <span class="casillas">${"<i></i>".repeat(d.largo)}</span>
+        <span class="marca" style="color:var(--soft);font-family:var(--mono);font-size:12px">${d.largo}</span></div>`).join("")}
+    </div>
+    <h3>En el teléfono</h3>
+    <p style="font-size:14px;line-height:1.55;color:var(--soft)">
+      Para <b style="color:var(--ink)">colocar</b>: elegí el barco en la lista, tocá <b style="color:var(--ink)">↻</b>
+      arriba para rotarlo y tocá el mar donde va la proa. «Al azar» te lo resuelve solo.<br><br>
+      Para <b style="color:var(--ink)">disparar</b>: el primer toque apunta y el segundo confirma, así no se te
+      escapa un tiro. Si te molesta, apagalo en Ajustes.
+    </p>
+  `);
+}
+
+/* ==================================================================
+   Menú
+   ================================================================== */
+
+function refrescarMenu(){
+  $("#verLabel").textContent = VERSION;
+
+  const nombres = { facil:"Fácil", normal:"Normal", dificil:"Difícil" };
+  $("#descIA").textContent = "Un jugador · dificultad " + (nombres[ajustes.dificultad] || "normal").toLowerCase();
+
+  $("#descStats").textContent = stats.jugadas
+    ? stats.jugadas + " partidas · " + Math.round(stats.ganadas * 100 / stats.jugadas) + "% de victorias"
+    : "Todavía sin partidas";
+
+  const guardada = cargarPartida();
+  const btn = $("#btnSeguir");
+  if (guardada && guardada.fase !== "fin"){
+    btn.hidden = false;
+    const restante = guardada.tableros[1] ? cascoRestante(guardada.tableros[1]) : CASCO_TOTAL;
+    $("#seguirDesc").textContent = (guardada.modo === "ia" ? "Contra la máquina" : "Dos jugadores") +
+      " · quedan " + restante + " de casco";
+  } else {
+    btn.hidden = true;
+  }
+}
+
+function arrancar(modo){
+  G = nuevaPartida(modo);
+  abrirColocacion(0);
+}
+
+/* ==================================================================
+   Eventos
+   ================================================================== */
+
+// --- menú ---
+$$("#pMenu .opcion[data-modo]").forEach(b => {
+  b.addEventListener("click", () => arrancar(b.dataset.modo));
+});
+$("#btnAjustes").addEventListener("click", hojaAjustes);
+$("#btnStats").addEventListener("click", hojaStats);
+$("#btnComoJuega").addEventListener("click", hojaComoJuega);
+$("#jugAyudaBtn").addEventListener("click", hojaComoJuega);
+
+$("#btnSeguir").addEventListener("click", () => {
+  const g = cargarPartida();
+  if (!g) { refrescarMenu(); return; }
+  G = g;
+  jug.mira = null; jug.bloqueo = false; jug.motivo = "";
+  if (G.fase === "colocar"){
+    // se cortó a mitad del despliegue: rehacemos ese paso
+    abrirColocacion(G.colocando || 0);
+  } else {
+    armarTablero($("#tabEnemigo"));
+    armarTablero($("#tabPropio"));
+    if (G.modo === "dos"){
+      velo(G.nombres[G.turno], "Retomando la partida.", () => { mostrar("pJuego"); refrescarJuego(); });
+    } else {
+      mostrar("pJuego"); refrescarJuego();
+    }
+  }
+});
+
+// --- colocación ---
+$("#tabCol").addEventListener("click", (e) => {
+  const cel = e.target.closest(".celda");
+  if (cel) tocarCeldaColocacion(+cel.dataset.i);
+});
+$("#tabCol").addEventListener("pointermove", (e) => {
+  if (e.pointerType !== "mouse") return;      // en táctil no hay hover que valga
+  const cel = e.target.closest(".celda");
+  const def = FLOTA.find(d => d.id === col.seleccion);
+  if (!cel || !def) return;
+  const celdas = tramo(+cel.dataset.i, def.largo, col.horiz);
+  col.previa = celdas || [];
+  refrescarColocacion();
+});
+$("#tabCol").addEventListener("pointerleave", () => {
+  if (!col.previa.length) return;
+  col.previa = []; refrescarColocacion();
+});
+
+$("#dique").addEventListener("click", (e) => {
+  const fila = e.target.closest(".barcofila");
+  if (!fila) return;
+  const id = fila.dataset.id;
+  const puesto = col.tablero.barcos.some(b => b.def.id === id);
+  // tocar un barco ya colocado lo levanta; tocar otro simplemente lo selecciona
+  if (puesto && col.seleccion === id) quitarBarco(col.tablero, id);
+  col.seleccion = id;
+  col.previa = [];
+  refrescarColocacion();
+});
+
+$("#colRotar").addEventListener("click", () => {
+  col.horiz = !col.horiz;
+  if (col.previa.length){
+    const def = FLOTA.find(d => d.id === col.seleccion);
+    const celdas = def ? tramo(col.previa[0], def.largo, col.horiz) : null;
+    col.previa = celdas || [];
+  }
+  refrescarColocacion();
+});
+
+$("#colAzar").addEventListener("click", () => {
+  col.tablero = desplegarAlAzar(ajustes.contacto);
+  col.previa = [];
+  col.seleccion = FLOTA[0].id;
+  refrescarColocacion();
+});
+
+$("#colVolver").addEventListener("click", () => { G = null; mostrar("pMenu"); refrescarMenu(); });
+
+$("#colListo").addEventListener("click", () => {
+  const k = G.colocando;
+  G.tableros[k] = col.tablero;
+
+  if (G.modo === "ia"){
+    G.tableros[1] = desplegarAlAzar(ajustes.contacto);
+    empezarJuego();
+    return;
+  }
+  if (k === 0){
+    guardarPartida();
+    velo(G.nombres[1], "Ahora desplegá tu flota.", () => abrirColocacion(1));
+  } else {
+    empezarJuego();
+  }
+});
+
+// --- juego ---
+$("#tabEnemigo").addEventListener("click", (e) => {
+  const cel = e.target.closest(".celda");
+  if (cel) tocarCeldaEnemiga(+cel.dataset.i);
+});
+$("#btnDisparar").addEventListener("click", () => {
+  if (jug.mira !== null) ejecutarDisparo(jug.mira);
+});
+$("#jugVolver").addEventListener("click", () => {
+  guardarPartida();
+  mostrar("pMenu"); refrescarMenu();
+});
+
+// --- fin ---
+$("#finMenu").addEventListener("click", () => { G = null; mostrar("pMenu"); refrescarMenu(); });
+$("#finRevancha").addEventListener("click", () => arrancar(G ? G.modo : "ia"));
+
+// atajos de teclado, para probar cómodo desde la compu
+document.addEventListener("keydown", (e) => {
+  if (e.target.matches("input")) return;
+  if (e.key === "r" || e.key === "R"){
+    if ($("#pColocar").classList.contains("activa")) $("#colRotar").click();
+  }
+  if (e.key === "Escape") cerrarHoja();
+});
+
+/* ==================================================================
+   Arranque
+   ================================================================== */
+
+aplicarTema();
+refrescarMenu();
+
+if ("serviceWorker" in navigator){
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>
