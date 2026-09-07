@@ -2,7 +2,7 @@
    Se juega en el colectivo, en el subte, donde no hay senal:
    la app tiene que abrir siempre. App shell cache-first, red primero
    para la navegacion asi una version nueva entra sin trucos. */
-const CACHE = "flota-v1.3.0";
+const CACHE = "flota-v1.4.0";
 const SHELL = ["./", "./index.html", "./apple-touch-icon.png"];
 
 self.addEventListener("install", e => {

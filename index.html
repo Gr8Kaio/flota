@@ -58,8 +58,13 @@
   }
 
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{margin:0; padding:0; height:100%; overscroll-behavior:none;}
+  /* La pagina no scrollea. En el telefono el scroll competia con el mantener
+     apretado: bastaba que el dedo arrastrara un pelo para que la pagina se
+     moviera y el levante se cancelara. position:fixed es el cerrojo que hace
+     falta en iOS; con overflow:hidden solo, Safari igual hamaca la pagina. */
+  html,body{margin:0; padding:0; height:100%; overflow:hidden; overscroll-behavior:none;}
   body{
+    position:fixed; inset:0;
     background:var(--bg); color:var(--ink);
     font-family:var(--sans); font-size:16px; line-height:1.45;
     -webkit-font-smoothing:antialiased;
@@ -69,7 +74,10 @@
   button{font:inherit; color:inherit; cursor:pointer;}
 
   /* ---------- estructura ---------- */
-  .pantalla{display:none; flex-direction:column; min-height:100dvh; max-width:520px; margin:0 auto; padding:14px 16px 24px;}
+  .pantalla{
+    display:none; flex-direction:column; height:100%; overflow:hidden;
+    max-width:520px; margin:0 auto; padding:14px 16px 18px;
+  }
   .pantalla.activa{display:flex;}
 
   .barra{display:flex; align-items:center; gap:10px; margin-bottom:12px; min-height:38px;}
@@ -114,6 +122,34 @@
 
   /* ---------- tablero ---------- */
   .tablerowrap{position:relative;}
+  /* El tablero principal cede altura: si la pantalla es corta se achica en vez
+     de empujar los botones fuera de la vista.
+     Ojo: limitarlo con max-height NO sirve. El tablero es una grilla cuadrada,
+     y al recortarle el alto aplasta las filas en vez de angostarse, con lo que
+     las celdas dejan de ser cuadradas. Hay que darle el lado explicito, y ese
+     lado sale de medir el hueco (--lado, lo pone el observador de tamaño).
+     El hueco usa flex:1 1 0 para que su alto salga del espacio sobrante y no
+     del contenido, si no la medida se muerde la cola. */
+  .tablerowrap.crece{flex:0 0 auto; display:flex; justify-content:center;}
+  .tablerowrap.crece > .tablero{width:min(100%, var(--lado, 100%));}
+  /* Ultimo recurso, para pantallas cortas: si ni con el tablero en su minimo
+     entra todo, cede lo prescindible y scrollea por dentro. La pagina sigue
+     quieta y, sobre todo, el tablero y los botones no se mueven nunca.
+     El orden del marcado importa: el bloque que cede va ultimo, asi lo que se
+     recorta es siempre lo de abajo y nunca un control. */
+  .pantalla.apretado .dique{flex:0 1 auto; min-height:56px; overflow-y:auto;}
+  .pantalla.apretado .propio{
+    flex:1 1 auto; min-height:0; overflow-y:auto;
+    overscroll-behavior:contain; touch-action:pan-y;
+  }
+  /* Los chips de flota pasan a una sola fila corrida: repiten lo que ya dice
+     el tablero, asi que son lo primero que puede achicarse. */
+  .pantalla.apretado .flotitas{
+    flex-wrap:nowrap; overflow-x:auto; overscroll-behavior:contain; touch-action:pan-x;
+  }
+  .pantalla.apretado .flotita{flex:none;}
+  .pantalla.apretado .btn{padding:11px 14px; font-size:15px;}
+  .pantalla.apretado .ayuda{margin-top:8px; min-height:0; font-size:12.5px;}
   /* Capa de barcos: va por encima de la grilla para que la silueta se lea
      entera. Las celdas que tienen que ganarle (mira, ultimo disparo) suben
      con z-index propio, por eso .tablero no crea contexto de apilado. */
@@ -129,7 +165,9 @@
   .minibuque{display:block; flex:none;}
   .tablero{
     display:grid; grid-template-columns:15px repeat(var(--n,10),1fr); grid-template-rows:15px repeat(var(--n,10),1fr);
-    gap:2px; width:100%; aspect-ratio:1/1; touch-action:manipulation;
+    gap:2px; width:100%; aspect-ratio:1/1;
+    /* Nunca hace scroll ni zoom: el dedo sobre el tablero es siempre del juego. */
+    touch-action:none;
   }
   .tablero.chico{gap:1.5px; grid-template-columns:11px repeat(var(--n,10),1fr); grid-template-rows:11px repeat(var(--n,10),1fr);}
   .rot{font-family:var(--mono); font-size:9px; color:var(--faint); display:grid; place-items:center; line-height:1;}
@@ -190,11 +228,11 @@
   .flotita.muerto .minibuque{opacity:.6;}
   .flotita.muerto{background:var(--fuego-dim); color:var(--fuego); text-decoration:line-through;}
 
-  .propio{margin-top:14px; display:flex; gap:12px; align-items:flex-start;}
+  .propio{margin-top:14px; display:flex; gap:12px; align-items:flex-start; flex:0 0 auto;}
   .propio .mini{width:44%; max-width:200px; flex:none;}
   .propio .lado{flex:1; min-width:0;}
 
-  .accion{margin-top:14px; display:flex; gap:10px;}
+  .accion{margin-top:14px; display:flex; gap:10px; flex:0 0 auto;}
   .btn{
     flex:1; background:var(--naval); color:var(--naval-ink); border:1px solid var(--naval);
     border-radius:12px; padding:14px 16px; font-weight:600; font-size:16px;
@@ -208,6 +246,7 @@
     margin-top:13px; background:var(--raised); border:1px solid var(--line); border-radius:12px;
     padding:4px 12px; font-family:var(--mono); font-size:12px; color:var(--soft);
     max-height:96px; overflow-y:auto; -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain; touch-action:pan-y;
   }
   .bitacora div{padding:5px 0; border-bottom:1px solid var(--line);}
   .bitacora div:last-child{border-bottom:0;}
@@ -215,7 +254,11 @@
   .bitacora .h{color:var(--fuego); font-weight:500;}
 
   /* ---------- colocación ---------- */
-  .dique{display:flex; flex-direction:column; gap:7px; margin-top:13px;}
+  .dique{
+    display:flex; flex-direction:column; gap:7px; margin-top:13px;
+    flex:0 0 auto; overscroll-behavior:contain;
+    touch-action:pan-y; -webkit-overflow-scrolling:touch;
+  }
   .barcofila{
     display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:11px;
     background:var(--raised); border:1px solid var(--line); box-shadow:var(--shadow); width:100%; text-align:left;
@@ -254,6 +297,7 @@
   .hoja .caja{
     background:var(--bg); border-radius:20px 20px 0 0; width:100%; max-width:520px;
     padding:8px 16px calc(20px + env(safe-area-inset-bottom)); max-height:88dvh; overflow-y:auto;
+    overscroll-behavior:contain; touch-action:pan-y;
     animation:subir .22s ease;
   }
   @keyframes subir{from{transform:translateY(24px); opacity:.4;} to{transform:none; opacity:1;}}
@@ -355,7 +399,7 @@
     <button class="iconbtn" id="colRotar" title="Rotar">&#8635;</button>
   </div>
 
-  <div class="tablerowrap"><div class="tablero" id="tabCol"></div></div>
+  <div class="tablerowrap crece"><div class="tablero" id="tabCol"></div></div>
 
   <p class="ayuda" id="colAyuda">Elegí un barco y tocá el mar para ubicarlo.</p>
 
@@ -381,7 +425,7 @@
   </div>
 
   <div class="rotulo"><span id="rotEnemigo">Aguas enemigas</span><span class="cnt" id="cntEnemigo"></span></div>
-  <div class="tablerowrap"><div class="tablero" id="tabEnemigo"></div></div>
+  <div class="tablerowrap crece"><div class="tablero" id="tabEnemigo"></div></div>
   <div class="flotitas" id="flotaEnemiga"></div>
 
   <div class="accion">
@@ -445,7 +489,7 @@
 
 <script>
 "use strict";
-const VERSION = "v1.3.0";
+const VERSION = "v1.4.0";
 
 /* ==================================================================
    Modelo
@@ -1027,8 +1071,51 @@ function capaBuques(el){
 const observador = new ResizeObserver(entradas => {
   for (const e of entradas) capaBuques(e.target);
 });
+
+/* La página no scrollea, así que lo que no entra hay que absorberlo: el
+   tablero es la única pieza elástica. Se lo deja crecer a lo ancho, se mide
+   cuánto sobresale la pantalla y se le descuenta ese sobrante al lado. Como
+   el tablero es cuadrado, bajarle el lado en N baja el alto total en N, así
+   que una sola pasada alcanza.
+   Se mide el sobrante en vez de repartir con flex porque una grilla cuadrada
+   con max-height no se angosta: aplasta las filas y arruina las celdas. */
+/* Por debajo de esto el tablero deja de ser jugable: 11 casilleros en 300px
+   dan celdas de 24px, que ya es lo minimo razonable para un dedo. Antes que
+   achicarlo mas, se recorta el bloque de abajo. */
+const LADO_MINIMO = 300;
+let acomodarPedido = false;
+
+function acomodarTableros(){
+  acomodarPedido = false;
+  const pan = document.querySelector(".pantalla.activa");
+  if (!pan) return;
+  const wrap = pan.querySelector(".tablerowrap.crece");
+  const tab = wrap && wrap.querySelector(".tablero");
+  if (!tab) return;
+
+  pan.classList.remove("apretado");
+  wrap.style.setProperty("--lado", "100%");
+  const lleno = tab.getBoundingClientRect().width;
+  const sobra = pan.scrollHeight - pan.clientHeight;
+  if (sobra > 0){
+    wrap.style.setProperty("--lado", Math.max(LADO_MINIMO, Math.floor(lleno - sobra)) + "px");
+    // Si ni achicándolo al mínimo alcanza, que scrollee la lista de barcos.
+    if (pan.scrollHeight - pan.clientHeight > 0) pan.classList.add("apretado");
+  }
+  capaBuques(tab);
+}
+
+/** Agrupa varios pedidos en un solo reacomodo por cuadro. */
+function pedirAcomodar(){
+  if (acomodarPedido) return;
+  acomodarPedido = true;
+  requestAnimationFrame(acomodarTableros);
+}
+window.addEventListener("resize", pedirAcomodar);
+window.addEventListener("orientationchange", pedirAcomodar);
 function relotarTodo(){
   requestAnimationFrame(() => {
+    acomodarTableros();
     document.querySelectorAll(".pantalla.activa .tablero").forEach(capaBuques);
   });
 }
@@ -1196,6 +1283,7 @@ function refrescarColocacion(){
     dique.appendChild(fila);
   }
 
+  if (!col.arrastre) pedirAcomodar();
   const faltan = FLOTA.length - t.barcos.length;
   $("#colListo").disabled = faltan > 0;
   $("#colListo").textContent = faltan > 0 ? "Faltan " + faltan : "Zarpar";
@@ -1425,6 +1513,7 @@ function refrescarJuego(){
   }
 
   pintarBitacora();
+  pedirAcomodar();     // los chips de flota crecen al hundirse barcos
 }
 
 function pintarBitacora(){

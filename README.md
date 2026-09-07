@@ -73,6 +73,8 @@ Cubre despliegue automático (400 tableros por cada regla de contacto), límites
 
 El arrastre se prueba aparte, en el navegador, disparando eventos de puntero reales: mudar un barco, rebotar contra otro, pegarse al borde, que un toque corto siga girando, que correr el dedo enseguida cancele, y que irse de la pantalla a mitad de un arrastre no pierda el barco.
 
+El layout también: se mide a cuatro alturas de teléfono (320×568, 375×667, 390×844, 430×932) que ninguna pantalla desborde, que las celdas sigan cuadradas y de un tamaño usable, y que los controles queden a la vista.
+
 El *ladder* de dificultad se mide con el generador de azar sembrado: con partidas al azar los rangos de normal y difícil casi se tocan y el test daba rojos falsos.
 
 `test.mjs` no duplica la lógica: la recorta del propio `index.html` y la importa como módulo, así no se puede desincronizar de lo que se publica.
@@ -89,6 +91,18 @@ Todo con un dedo, sin arrastrar:
 El arrastre va **encajado a la grilla**: el barco salta de casillero en casillero en vez de flotar libre, que en un tablero se siente mejor y no deja sueltas ambiguas. Se implementa levantando el barco del modelo y reusando el fantasma de previsualización, así el estado no se duplica. El barco recuerda por qué parte lo agarraste, se pega al borde en lugar de salirse, y si lo soltás donde está ocupado se pinta entero de rojo antes de volver a su sitio.
 
 Dos detalles que hacen que no moleste: si el dedo se corre más de 10px antes de los 380ms, se cancela — era un scroll, no un mantener apretado; y el `click` que llega después de soltar se ignora, para que la suelta no dispare además un giro.
+
+## La pantalla no scrollea
+
+El scroll de la página competía con el mantener apretado: bastaba que el dedo arrastrara un pelo para que la página se moviera y el levante se cancelara. Así que la app es una pantalla fija — `position: fixed` en el `body`, que es el cerrojo que hace falta en iOS (con `overflow: hidden` solo, Safari igual hamaca la página), y `touch-action: none` en el tablero, para que el dedo ahí sea siempre del juego.
+
+Eso obliga a que todo entre. La pieza elástica es el tablero: se lo deja crecer a lo ancho, se mide cuánto sobresale la pantalla y se le descuenta ese sobrante al lado. Como es cuadrado, bajarle el lado en N baja el alto total en N, así que una sola pasada alcanza.
+
+Limitarlo con `max-height` **no** sirve: una grilla cuadrada a la que se le recorta el alto aplasta las filas en vez de angostarse, y las celdas dejan de ser cuadradas. Hay que darle el lado explícito.
+
+El tablero no baja de 300px (celdas de 24px, el mínimo razonable para un dedo). Si aun así no entra —un iPhone SE, por ejemplo— la pantalla entra en modo `apretado` y cede lo prescindible: los chips de flota pasan a una sola fila corrida, los botones se achican, y el bloque de abajo (lista de barcos, o tablero chico y bitácora) scrollea por dentro. El orden del marcado importa: el bloque que cede va último, así lo que se recorta es siempre lo de abajo y nunca un control.
+
+En 390×844 y más grande entra todo sin scroll en ningún lado.
 
 Los barcos se dibujan como siluetas continuas en una capa SVG por encima de la grilla, no casillero por casillero: por eso un portaaviones se ve como un portaaviones y no como cinco cuadrados.
 
